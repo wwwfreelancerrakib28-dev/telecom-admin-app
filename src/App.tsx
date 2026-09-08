@@ -34,8 +34,7 @@ import {
   Ban,
   Ticket,
   Sparkles,
-  ListFilter,
-  UserCheck2
+  ListFilter
 } from 'lucide-react';
 
 export default function AdminApp() {
@@ -63,10 +62,10 @@ export default function AdminApp() {
   const [noticeInput, setNoticeInput] = useState(runningNotice);
   const [soundAlertEnabled, setSoundAlertEnabled] = useState(true);
 
-  // ব্রডকাস্ট ও পার্সোনাল নোটিফিকেশন স্টেট
+  // ব্রডকাস্ট ও পার্সোনাল নোটিফিকেশন স্টেট (বিল্ড এরর ফিক্সড)
   const [broadcastType, setBroadcastType] = useState<'all' | 'personal'>('all');
   const [targetPhone, setTargetPhone] = useState('');
-  const [personalMsg, setPersonalMsg] = useState('');
+  const [broadcastMsg, setBroadcastMsg] = useState('');
 
   const [scratchCardsList, setScratchCardsList] = useState([
     { id: 'SC-1', type: 'Minute', title: '50 মিনিট প্যাক', price: 30, pin: '*123*88493021#' }
@@ -110,6 +109,16 @@ export default function AdminApp() {
   const pendingRechargeCount = rechargeOrders.filter(o => o.status === 'Pending').length;
   const pendingDriveCount = driveOrders.filter(o => o.status === 'Pending').length;
 
+  // লাইভ চ্যাট ইউজার লিস্ট
+  const [chatUsers] = useState([
+    { id: '1', name: 'User', phone: '01728116153', mainBalance: 1400, driveBalance: 3870, avatarBg: 'bg-indigo-600', lastMsg: 'ভাই রিচার্জ আটকে আছে' }
+  ]);
+  const [activeChatUser] = useState<any>(chatUsers[0]);
+  const [chatMessages, setChatMessages] = useState([
+    { sender: 'user', text: 'ভাই রিচার্জ আটকে আছে' }
+  ]);
+  const [replyText, setReplyText] = useState('');
+
   const handleBack = () => {
     if (cancellingOrder) {
       setCancellingOrder(null);
@@ -138,6 +147,14 @@ export default function AdminApp() {
     };
   }, [cancellingOrder, editingOffer, editingUser, selectedUser, activeSection]);
 
+  const [operatorStatus, setOperatorStatus] = useState<Record<string, boolean>>({
+    Grameenphone: true, Robi: true, Banglalink: true, Airtel: true, Teletalk: false
+  });
+  const [driveServiceEnabled, setDriveServiceEnabled] = useState(true);
+  const [rechargeOperatorStatus, setRechargeOperatorStatus] = useState<Record<string, boolean>>({
+    Grameenphone: true, Robi: true, Banglalink: true, Airtel: true, Teletalk: true
+  });
+
   const [usersList, setUsersList] = useState([
     { id: '1', name: 'User', phone: '01728116153', pin: '1234', mainBalance: 1400, driveBalance: 3870, isBanned: false },
     { id: '2', name: 'Rakib Telecom', phone: '01844556677', pin: '5566', mainBalance: 500, driveBalance: 1200, isBanned: false }
@@ -150,10 +167,6 @@ export default function AdminApp() {
     { id: '1', operator: 'Grameenphone', title: '30 GB + 700 Min (30 Days)', offerPrice: 580, cashback: 119, profit: 45, note: 'ঢাকা ও চট্টগ্রাম' }
   ]);
   const [newOffer, setNewOffer] = useState({ operator: 'Grameenphone', title: '', offerPrice: '', cashback: '', profit: '', note: '' });
-
-  const [chatMessages, setChatMessages] = useState([{ sender: 'user', text: 'ভাই রিচার্জ আটকে আছে' }]);
-  const [replyText, setReplyText] = useState('');
-  const [socialLinks, setSocialLinks] = useState({ facebook: 'https://facebook.com', whatsappNumber: '01728116153', whatsappLink: 'https://wa.me/8801728116153' });
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,6 +214,13 @@ export default function AdminApp() {
     setOffers(prev => [...prev, { id: Date.now().toString(), ...newOffer, offerPrice: Number(newOffer.offerPrice), cashback: Number(newOffer.cashback) || 0, profit: Number(newOffer.profit) || 0 }]);
     setNewOffer({ operator: 'Grameenphone', title: '', offerPrice: '', cashback: '', profit: '', note: '' });
     alert('পাবলিশ হয়েছে!');
+  };
+
+  const handleSaveEditedOffer = () => {
+    if (!editingOffer) return;
+    setOffers(prev => prev.map(o => o.id === editingOffer.id ? editingOffer : o));
+    setEditingOffer(null);
+    alert('মডিফাই সফল হয়েছে!');
   };
 
   const handleAddNewCard = () => {
@@ -365,14 +385,12 @@ export default function AdminApp() {
         {/* উন্নত রানিং ও পার্সোনাল নোটিশ ব্রডকাস্ট পেজ */}
         {activeSection === 'broadcast' && (
           <div className="space-y-3">
-            {/* রানিং নোটিশ আপডেট */}
             <div className="bg-white border rounded-2xl p-3.5 space-y-2.5 shadow-sm">
               <h4 className="font-bold text-slate-900 border-b pb-1.5">রানিং নোটিশ আপডেট (App Marquee)</h4>
               <input type="text" value={noticeInput} onChange={(e) => setNoticeInput(e.target.value)} className="w-full bg-slate-50 border rounded-xl p-2.5 font-medium" />
-              <button onClick={() => { setRunningNotice(noticeInput); alert('রানিং নোটিশ আপডেট হয়েছে!'); }} className="w-full py-2.5 bg-indigo-600 text-white font-bold rounded-xl">আপডেট করুন</button>
+              <button onClick={() => { setRunningNotice(noticeInput); alert('রানিং নোটিশ আপডেট হয়েছে!'); }} className="w-full py-2.5 bg-indigo-600 text-white font-bold rounded-xl">আপডেট করুন</button>
             </div>
 
-            {/* ব্রডকাস্ট টাইপ সিলেক্টর (সবার জন্য নাকি পার্সোনাল) */}
             <div className="bg-white border rounded-2xl p-3.5 space-y-3 shadow-sm">
               <h4 className="font-bold text-slate-900 border-b pb-1.5 flex items-center gap-1.5">
                 <BellRing className="w-4 h-4 text-indigo-600" /> নোটিফিকেশন ও মেসেজ সেন্ডার
@@ -668,7 +686,7 @@ export default function AdminApp() {
                 <label className="text-[10px] font-bold text-purple-600 block mb-0.5">Rocket নম্বর</label>
                 <input type="tel" value={paymentNumbers.rocket} onChange={(e) => setPaymentNumbers({ ...paymentNumbers, rocket: e.target.value })} className="w-full bg-slate-50 border rounded-xl p-2 text-xs font-mono font-bold" />
               </div>
-              <button onClick={() => alert('নম্বর সফলভাবে আপডেট করা হয়েছে!')} className="w-full py-2.5 bg-indigo-600 text-white font-bold rounded-xl shadow-md">
+              <button onClick={() => alert('নম্বর সফলভাবে আপডেট করা হয়েছে!')} className="w-full py-2.5 bg-indigo-600 text-white font-bold rounded-xl shadow-md">
                 নম্বরগুলো সেভ করুন
               </button>
             </div>
@@ -714,7 +732,7 @@ export default function AdminApp() {
           <div className="space-y-2.5">
             <div className="relative">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
-              <input type="text" placeholder="নম্বর বা নাম দিয়ে খুঁজুন..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-white border rounded-xl pl-9 pr-3 py-2 shadow-sm" />
+              <input type="text" placeholder="নম্বর বা নাম দিয়ে খুঁজুন..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-white border rounded-xl pl-9 pr-3 py-2 shadow-sm" />
             </div>
             {filteredUsers.map((u) => (
               <div key={u.id} onClick={() => handleOpenUser(u)} className="bg-white border rounded-xl p-3 flex items-center justify-between shadow-sm cursor-pointer">
@@ -748,20 +766,54 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* লাইভ চ্যাট */}
+        {/* লাইভ চ্যাট (যেখানে ইউজারের প্রোফাইল নাম, ছবি ও ব্যালেন্স ওপরের দিকে ছোট করে শো করবে) */}
         {activeSection === 'chats' && (
-          <div className="bg-white border rounded-2xl p-3 h-[380px] flex flex-col">
-            <div className="border-b pb-1.5 mb-2 font-bold">লাইভ চ্যাট সাপোর্ট</div>
-            <div className="flex-1 overflow-y-auto space-y-2">
+          <div className="bg-white border rounded-2xl p-3 h-[420px] flex flex-col shadow-sm">
+            <div className="border-b pb-2 mb-2 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className={`w-9 h-9 rounded-full ${activeChatUser.avatarBg} text-white flex items-center justify-center font-bold text-sm shadow-sm`}>
+                  {activeChatUser.name.charAt(0)}
+                </div>
+                <div>
+                  <h4 className="font-bold text-slate-900 text-xs leading-tight">{activeChatUser.name}</h4>
+                  <p className="text-[10px] text-slate-400 font-mono">📱 {activeChatUser.phone}</p>
+                </div>
+              </div>
+              <div className="bg-slate-100 border border-slate-200/80 px-2.5 py-1 rounded-xl text-right">
+                <p className="text-[9px] text-slate-400 font-semibold uppercase">ব্যালেন্স</p>
+                <p className="text-[10px] font-bold font-mono text-indigo-600">মেইন: ৳{activeChatUser.mainBalance} | ড্রাইভ: ৳{activeChatUser.driveBalance}</p>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
               {chatMessages.map((msg, i) => (
                 <div key={i} className={`flex ${msg.sender === 'admin' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] rounded-xl px-3 py-1.5 ${msg.sender === 'admin' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-800'}`}>{msg.text}</div>
+                  <div className={`max-w-[80%] rounded-2xl px-3 py-1.5 text-xs ${msg.sender === 'admin' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-800'}`}>
+                    {msg.text}
+                  </div>
                 </div>
               ))}
             </div>
-            <div className="flex gap-1.5 pt-2 border-t">
-              <input type="text" placeholder="উত্তর..." value={replyText} onChange={(e) => setReplyText(e.target.value)} className="flex-1 bg-slate-50 border rounded-xl px-3 py-1.5" />
-              <button onClick={() => { if(replyText){ setChatMessages([...chatMessages, {sender:'admin', text:replyText}]); setReplyText(''); } }} className="p-2 bg-indigo-600 text-white rounded-xl"><Send className="w-3.5 h-3.5" /></button>
+
+            <div className="flex gap-1.5 pt-2 border-t mt-2">
+              <input 
+                type="text" 
+                placeholder="উত্তর লিখুন..." 
+                value={replyText} 
+                onChange={(e) => setReplyText(e.target.value)} 
+                className="flex-1 bg-slate-50 border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-600" 
+              />
+              <button 
+                onClick={() => {
+                  if (replyText.trim()) {
+                    setChatMessages([...chatMessages, { sender: 'admin', text: replyText.trim() }]);
+                    setReplyText('');
+                  }
+                }} 
+                className="p-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-sm active:scale-95"
+              >
+                <Send className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
         )}
