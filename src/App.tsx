@@ -22,7 +22,9 @@ import {
   ChevronRight,
   FileText,
   Radio,
-  SendHorizontal
+  CheckCircle,
+  XCircle,
+  Clock
 } from 'lucide-react';
 
 export default function AdminApp() {
@@ -31,30 +33,39 @@ export default function AdminApp() {
   const [adminPin, setAdminPin] = useState('');
   const [authError, setAuthError] = useState('');
 
-  // মেনু নেভিগেশন স্টেট ('recharge_history' যোগ করা হয়েছে)
-  const [activeSection, setActiveSection] = useState<'menu' | 'users' | 'add_money' | 'recharge_history' | 'offers' | 'chats' | 'links'>('menu');
+  // মেনু নেভিগেশন স্টেট ('recharge_orders', 'drive_orders', 'history' যুক্ত করা হয়েছে)
+  const [activeSection, setActiveSection] = useState<'menu' | 'users' | 'add_money' | 'recharge_orders' | 'drive_orders' | 'offers' | 'history' | 'chats' | 'links'>('menu');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   const [customMainBalance, setCustomMainBalance] = useState('');
   const [customDriveBalance, setCustomDriveBalance] = useState('');
   const [editingUser, setEditingUser] = useState<any | null>(null);
 
+  // ক্যানসেল করার জন্য নোট মডাল স্টেট
+  const [cancellingOrder, setCancellingOrder] = useState<any | null>(null);
+  const [cancelNote, setCancelNote] = useState('');
+
   // অফার ফিল্টার ও এডিট স্টেট
   const [selectedOperatorFilter, setSelectedOperatorFilter] = useState('Grameenphone');
   const [editingOffer, setEditingOffer] = useState<any | null>(null);
 
-  // রিচার্জ সার্ভিস অন/অফ স্টেট
-  const [rechargeEnabled, setRechargeEnabled] = useState(true);
+  // রিচার্জ ও ড্রাইভ অর্ডার তালিকা (লাইভ রিকোয়েস্ট)
+  const [rechargeOrders, setRechargeOrders] = useState([
+    { id: 'RCH-101', userId: '1', userName: 'User', userPhone: '01728116153', operator: 'Grameenphone', amount: 200, targetNumber: '01711223344', time: '10:45 AM', status: 'Pending', note: '' },
+    { id: 'RCH-102', userId: '2', userName: 'Rakib Telecom', userPhone: '01844556677', operator: 'Robi', amount: 500, targetNumber: '01811223344', time: '11:15 AM', status: 'Completed', note: '' }
+  ]);
 
-  // সব রিচার্জ ও ড্রাইভ অর্ডারের লাইভ হিস্ট্রি
-  const [rechargeLogs, setRechargeLogs] = useState([
-    { id: 'TXN-101', userName: 'User', userPhone: '01728116153', operator: 'Grameenphone', type: 'Flexiload', amount: 200, targetNumber: '01711223344', time: '10:45 AM', status: 'Success' },
-    { id: 'TXN-102', userName: 'Rakib Telecom', userPhone: '01844556677', operator: 'Robi', type: 'Drive Pack', amount: 580, targetNumber: '01811223344', time: '11:15 AM', status: 'Pending' }
+  const [driveOrders, setDriveOrders] = useState([
+    { id: 'DRV-201', userId: '1', userName: 'User', userPhone: '01728116153', operator: 'Grameenphone', packageTitle: '30 GB + 700 Min', price: 580, targetNumber: '01711223344', time: '12:00 PM', status: 'Pending', note: '' },
+    { id: 'DRV-202', userId: '2', userName: 'Rakib Telecom', userPhone: '01844556677', operator: 'Robi', packageTitle: '50 GB + 1000 Min', price: 750, targetNumber: '01811223344', time: '12:30 PM', status: 'Completed', note: '' }
   ]);
 
   // ব্যাক বাটন হ্যান্ডলার
   const handleBack = () => {
-    if (editingOffer) {
+    if (cancellingOrder) {
+      setCancellingOrder(null);
+      setCancelNote('');
+    } else if (editingOffer) {
       setEditingOffer(null);
     } else if (editingUser) {
       setEditingUser(null);
@@ -67,7 +78,7 @@ export default function AdminApp() {
 
   useEffect(() => {
     const backListener = CapacitorApp.addListener('backButton', () => {
-      if (editingOffer || editingUser || selectedUser || activeSection !== 'menu') {
+      if (cancellingOrder || editingOffer || editingUser || selectedUser || activeSection !== 'menu') {
         handleBack();
       } else {
         CapacitorApp.exitApp();
@@ -77,7 +88,7 @@ export default function AdminApp() {
     return () => {
       backListener.then(handler => handler.remove());
     };
-  }, [editingOffer, editingUser, selectedUser, activeSection]);
+  }, [cancellingOrder, editingOffer, editingUser, selectedUser, activeSection]);
 
   const [operatorStatus, setOperatorStatus] = useState<Record<string, boolean>>({
     Grameenphone: true,
@@ -165,6 +176,16 @@ export default function AdminApp() {
     setCustomDriveBalance(u.driveBalance.toString());
   };
 
+  const handleOpenUserById = (userId: string) => {
+    const found = usersList.find(u => u.id === userId);
+    if (found) {
+      handleOpenUser(found);
+      setActiveSection('users');
+    } else {
+      alert('ইউজার ডাটা পাওয়া যায়নি!');
+    }
+  };
+
   const handleSaveBalance = () => {
     if (!selectedUser) return;
     const main = customMainBalance === '' ? 0 : Number(customMainBalance);
@@ -211,6 +232,28 @@ export default function AdminApp() {
     setOffers(prev => prev.map(o => o.id === editingOffer.id ? editingOffer : o));
     setEditingOffer(null);
     alert('অফার সফলভাবে আপডেট করা হয়েছে!');
+  };
+
+  // রিচার্জ অর্ডার কমপ্লিট করা
+  const completeRechargeOrder = (id: string) => {
+    setRechargeOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'Completed' } : o));
+  };
+
+  // ড্রাইভ অর্ডার কমপ্লিট করা
+  const completeDriveOrder = (id: string) => {
+    setDriveOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'Completed' } : o));
+  };
+
+  // অর্ডার ক্যানসেল করা (নোটসহ)
+  const submitCancelOrder = (type: 'recharge' | 'drive') => {
+    if (!cancellingOrder) return;
+    if (type === 'recharge') {
+      setRechargeOrders(prev => prev.map(o => o.id === cancellingOrder.id ? { ...o, status: 'Cancelled', note: cancelNote.trim() } : o));
+    } else {
+      setDriveOrders(prev => prev.map(o => o.id === cancellingOrder.id ? { ...o, status: 'Cancelled', note: cancelNote.trim() } : o));
+    }
+    setCancellingOrder(null);
+    setCancelNote('');
   };
 
   const handleSendMessage = () => {
@@ -354,14 +397,36 @@ export default function AdminApp() {
               </button>
 
               <button
-                onClick={() => setActiveSection('recharge_history')}
+                onClick={() => setActiveSection('recharge_orders')}
+                className="bg-white border border-slate-200/80 rounded-3xl p-4 flex flex-col items-center text-center shadow-sm hover:shadow-md active:scale-95 transition-all"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center mb-2">
+                  <Send className="w-6 h-6" />
+                </div>
+                <span className="text-xs font-bold text-slate-900">রিচার্জ অর্ডার</span>
+                <span className="text-[10px] text-slate-400">কমপ্লিট বা ক্যানসেল</span>
+              </button>
+
+              <button
+                onClick={() => setActiveSection('drive_orders')}
                 className="bg-white border border-slate-200/80 rounded-3xl p-4 flex flex-col items-center text-center shadow-sm hover:shadow-md active:scale-95 transition-all"
               >
                 <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-2">
-                  <SendHorizontal className="w-6 h-6" />
+                  <Flame className="w-6 h-6" />
                 </div>
-                <span className="text-xs font-bold text-slate-900">রিচার্জ হিস্ট্রি</span>
-                <span className="text-[10px] text-slate-400">কে কোথায় রিচার্জ দিল</span>
+                <span className="text-xs font-bold text-slate-900">ড্রাইভ অর্ডার</span>
+                <span className="text-[10px] text-slate-400">প্যাকেজ রিকোয়েস্ট</span>
+              </button>
+
+              <button
+                onClick={() => setActiveSection('history')}
+                className="bg-white border border-slate-200/80 rounded-3xl p-4 flex flex-col items-center text-center shadow-sm hover:shadow-md active:scale-95 transition-all"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center mb-2">
+                  <History className="w-6 h-6" />
+                </div>
+                <span className="text-xs font-bold text-slate-900">History (সকল তথ্য)</span>
+                <span className="text-[10px] text-slate-400">রিচার্জ ও ড্রাইভ রিপোর্ট</span>
               </button>
 
               <button
@@ -380,7 +445,7 @@ export default function AdminApp() {
                 className="bg-white border border-slate-200/80 rounded-3xl p-4 flex flex-col items-center text-center shadow-sm hover:shadow-md active:scale-95 transition-all"
               >
                 <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mb-2">
-                  <Flame className="w-6 h-6" />
+                  <Radio className="w-6 h-6" />
                 </div>
                 <span className="text-xs font-bold text-slate-900">ড্রাইভ প্যাক কন্ট্রোল</span>
                 <span className="text-[10px] text-slate-400">সিম ও অফার ম্যানেজ</span>
@@ -411,7 +476,7 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* ১. মোট ইউজার ও ইউজার ম্যানেজার */}
+        {/* ১. মোট ইউজার ম্যানেজার */}
         {activeSection === 'users' && !selectedUser && (
           <div className="space-y-3">
             <div className="relative">
@@ -545,46 +610,47 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* নতুন: রিচার্জ হিস্ট্রি ও কন্ট্রোল অপশন */}
-        {activeSection === 'recharge_history' && (
+        {/* নতুন: রিচার্জ অর্ডার ম্যানেজমেন্ট (Complete & Cancelled উইথ নোট) */}
+        {activeSection === 'recharge_orders' && (
           <div className="space-y-4">
-            <div className="bg-white border rounded-3xl p-4 flex items-center justify-between shadow-sm">
-              <div>
-                <h4 className="text-xs font-bold text-slate-900">ফ্লেক্সিলোড / রিচার্জ সার্ভিস</h4>
-                <p className="text-[10px] text-slate-400">বন্ধ করলে ইউজাররা রিচার্জ অর্ডার করতে পারবে না</p>
-              </div>
-              <button onClick={() => setRechargeEnabled(!rechargeEnabled)}>
-                {rechargeEnabled ? (
-                  <span className="text-emerald-600 text-xs font-bold bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl flex items-center gap-1">
-                    <ToggleRight className="w-5 h-5" /> চালু
-                  </span>
-                ) : (
-                  <span className="text-rose-600 text-xs font-bold bg-rose-50 border border-rose-200 px-3 py-1.5 rounded-xl flex items-center gap-1">
-                    <ToggleLeft className="w-5 h-5" /> বন্ধ
-                  </span>
-                )}
-              </button>
-            </div>
-
             <div className="bg-white border rounded-3xl p-4 space-y-3 shadow-sm">
               <h4 className="text-xs font-bold text-slate-900 border-b pb-2 flex items-center gap-1.5">
-                <History className="w-4 h-4 text-indigo-600" /> কে কোন সিমে কত টাকা রিচার্জ দিল
+                <Send className="w-4 h-4 text-sky-600" /> ফ্লেক্সিলোড / রিচার্জ অর্ডার রিকোয়েস্ট
               </h4>
 
               <div className="space-y-2.5">
-                {rechargeLogs.map((log) => (
-                  <div key={log.id} className="bg-slate-50 border border-slate-200 rounded-2xl p-3 flex items-center justify-between">
-                    <div>
+                {rechargeOrders.map((ord) => (
+                  <div key={ord.id} className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-2">
+                    <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">{log.operator}</span>
-                        <span className="text-xs font-bold text-slate-900">{log.type} - ৳{log.amount}</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200">{ord.operator}</span>
+                        <span className="text-xs font-bold text-slate-900">৳{ord.amount}</span>
                       </div>
-                      <p className="text-[11px] text-slate-600 mt-1">প্রাপক নম্বর: <strong className="font-mono">{log.targetNumber}</strong></p>
-                      <p className="text-[10px] text-slate-400">গ্রাহক: {log.userName} ({log.userPhone}) • {log.time}</p>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${
+                        ord.status === 'Completed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                        ord.status === 'Cancelled' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
+                        'bg-amber-50 text-amber-700 border border-amber-200'
+                      }`}>
+                        {ord.status}
+                      </span>
                     </div>
-                    <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">
-                      {log.status}
-                    </span>
+
+                    <div className="text-[11px] text-slate-600 space-y-0.5">
+                      <p>প্রাপক নম্বর: <strong className="font-mono text-slate-900">{ord.targetNumber}</strong></p>
+                      <p>গ্রাহক: <button onClick={() => handleOpenUserById(ord.userId)} className="text-indigo-600 font-bold underline">{ord.userName} ({ord.userPhone})</button> • {ord.time}</p>
+                      {ord.note && <p className="text-[10px] text-rose-600 bg-rose-50/50 p-1 rounded">❌ নোট: {ord.note}</p>}
+                    </div>
+
+                    {ord.status === 'Pending' && (
+                      <div className="flex gap-2 pt-1">
+                        <button onClick={() => completeRechargeOrder(ord.id)} className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1">
+                          <CheckCircle className="w-3.5 h-3.5" /> Complete
+                        </button>
+                        <button onClick={() => setCancellingOrder({ ...ord, type: 'recharge' })} className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1">
+                          <XCircle className="w-3.5 h-3.5" /> Cancel
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -592,7 +658,116 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* ২. এড মানি কন্ট্রোল */}
+        {/* নতুন: ড্রাইভ অর্ডার ম্যানেজমেন্ট (Complete & Cancelled উইথ নোট) */}
+        {activeSection === 'drive_orders' && (
+          <div className="space-y-4">
+            <div className="bg-white border rounded-3xl p-4 space-y-3 shadow-sm">
+              <h4 className="text-xs font-bold text-slate-900 border-b pb-2 flex items-center gap-1.5">
+                <Flame className="w-4 h-4 text-amber-600" /> ড্রাইভ প্যাক অর্ডার রিকোয়েস্ট
+              </h4>
+
+              <div className="space-y-2.5">
+                {driveOrders.map((ord) => (
+                  <div key={ord.id} className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">{ord.operator}</span>
+                        <span className="text-xs font-bold text-slate-900">{ord.packageTitle} - ৳{ord.price}</span>
+                      </div>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${
+                        ord.status === 'Completed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                        ord.status === 'Cancelled' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
+                        'bg-amber-50 text-amber-700 border border-amber-200'
+                      }`}>
+                        {ord.status}
+                      </span>
+                    </div>
+
+                    <div className="text-[11px] text-slate-600 space-y-0.5">
+                      <p>প্রাপক নম্বর: <strong className="font-mono text-slate-900">{ord.targetNumber}</strong></p>
+                      <p>গ্রাহক: <button onClick={() => handleOpenUserById(ord.userId)} className="text-indigo-600 font-bold underline">{ord.userName} ({ord.userPhone})</button> • {ord.time}</p>
+                      {ord.note && <p className="text-[10px] text-rose-600 bg-rose-50/50 p-1 rounded">❌ নোট: {ord.note}</p>}
+                    </div>
+
+                    {ord.status === 'Pending' && (
+                      <div className="flex gap-2 pt-1">
+                        <button onClick={() => completeDriveOrder(ord.id)} className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1">
+                          <CheckCircle className="w-3.5 h-3.5" /> Complete
+                        </button>
+                        <button onClick={() => setCancellingOrder({ ...ord, type: 'drive' })} className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1">
+                          <XCircle className="w-3.5 h-3.5" /> Cancel
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* অর্ডার ক্যানসেল করার নোট মডাল */}
+        {cancellingOrder && (
+          <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl p-5 max-w-xs w-full space-y-3 shadow-2xl">
+              <h4 className="text-xs font-bold text-slate-900 border-b pb-2">অর্ডার ক্যানসেল ও নোট</h4>
+              <p className="text-[11px] text-slate-500">কেন অর্ডারটি ক্যানসেল করা হলো তার একটি নোট লিখতে পারেন (ঐচ্ছিক):</p>
+              <textarea
+                placeholder="যেমন: ভুল নম্বর দেওয়া হয়েছে / টাকা পাওয়া যায়নি"
+                value={cancelNote}
+                onChange={(e) => setCancelNote(e.target.value)}
+                className="w-full bg-slate-50 border rounded-xl p-2.5 text-xs h-20 focus:outline-none focus:border-indigo-600"
+              />
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => { setCancellingOrder(null); setCancelNote(''); }} className="flex-1 py-2 bg-slate-100 rounded-xl text-xs font-bold">ফিরে যান</button>
+                <button onClick={() => submitCancelOrder(cancellingOrder.type)} className="flex-1 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold">ক্যানসেল নিশ্চিত করুন</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* নতুন: History অপশন (সকল রিচার্জ ও ড্রাইভ তথ্য, নাম, নম্বর ক্লিক করলে প্রোফাইলে যাওয়া) */}
+        {activeSection === 'history' && (
+          <div className="space-y-4">
+            <div className="bg-white border rounded-3xl p-4 space-y-3 shadow-sm">
+              <h4 className="text-xs font-bold text-slate-900 border-b pb-2 flex items-center gap-1.5">
+                <History className="w-4 h-4 text-violet-600" /> রিচার্জ ও ড্রাইভ সম্পূর্ণ হিস্ট্রি রিপোর্ট
+              </h4>
+
+              <div className="space-y-2.5">
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">-- ফ্লেক্সিলোড হিস্ট্রি --</p>
+                {rechargeOrders.map((ord) => (
+                  <div key={ord.id} className="bg-slate-50 border rounded-2xl p-3 flex items-center justify-between text-xs">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900">৳{ord.amount} ({ord.operator})</span>
+                        <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${ord.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : ord.status === 'Cancelled' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{ord.status}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-600 mt-0.5">নাম্বার: <span className="font-mono">{ord.targetNumber}</span></p>
+                      <p className="text-[10px] text-slate-400">গ্রাহক: <button onClick={() => handleOpenUserById(ord.userId)} className="text-indigo-600 underline font-bold">{ord.userName} ({ord.userPhone})</button></p>
+                    </div>
+                  </div>
+                ))}
+
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider pt-3">-- ড্রাইভ প্যাক হিস্ট্রি --</p>
+                {driveOrders.map((ord) => (
+                  <div key={ord.id} className="bg-slate-50 border rounded-2xl p-3 flex items-center justify-between text-xs">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900">{ord.packageTitle} (৳{ord.price})</span>
+                        <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${ord.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : ord.status === 'Cancelled' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{ord.status}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-600 mt-0.5">নাম্বার: <span className="font-mono">{ord.targetNumber}</span></p>
+                      <p className="text-[10px] text-slate-400">গ্রাহক: <button onClick={() => handleOpenUserById(ord.userId)} className="text-indigo-600 underline font-bold">{ord.userName} ({ord.userPhone})</button></p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ৩. এড মানি কন্ট্রোল */}
         {activeSection === 'add_money' && (
           <div className="space-y-4">
             <div className="bg-white border rounded-3xl p-4 flex items-center justify-between shadow-sm">
@@ -634,7 +809,7 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* ৩. ড্রাইভ অফার কন্ট্রোল ও মডিফাই সিস্টেম */}
+        {/* ৪. ড্রাইভ অফার কন্ট্রোল ও মডিফাই সিস্টেম */}
         {activeSection === 'offers' && (
           <div className="space-y-4">
             <div className="bg-white border border-slate-200 rounded-3xl p-4 shadow-sm">
@@ -757,10 +932,9 @@ export default function AdminApp() {
               </button>
             </div>
 
-            {/* অপারেটর সিলেক্টর ট্যাব (যে সিমে ড্রাইভ এড করবেন বা ফিল্টার করে দেখতে চান) */}
             <div className="bg-white border rounded-3xl p-4 space-y-3 shadow-sm">
               <div className="flex justify-between items-center border-b pb-2">
-                <h4 className="text-xs font-bold text-slate-800">অপারফাইট অনুযায়ী অফার লিস্ট</h4>
+                <h4 className="text-xs font-bold text-slate-800">অপারেটর অনুযায়ী অফার লিস্ট</h4>
                 <select
                   value={selectedOperatorFilter}
                   onChange={(e) => setSelectedOperatorFilter(e.target.value)}
@@ -799,7 +973,6 @@ export default function AdminApp() {
               </div>
             </div>
 
-            {/* অফার এডিট বা মডিফাই করার পপআপ মডাল */}
             {editingOffer && (
               <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
                 <div className="bg-white rounded-3xl p-5 max-w-xs w-full space-y-3 shadow-2xl">
@@ -832,7 +1005,7 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* ৪. লাইভ চ্যাট */}
+        {/* ৫. লাইভ চ্যাট */}
         {activeSection === 'chats' && (
           <div className="bg-white border rounded-3xl p-3.5 h-[450px] flex flex-col shadow-sm">
             <div className="border-b pb-2 mb-2 flex items-center gap-2">
@@ -853,7 +1026,7 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* ৫. সোশ্যাল লিংক */}
+        {/* ৬. সোশ্যাল লিংক */}
         {activeSection === 'links' && (
           <div className="bg-white border rounded-3xl p-4 space-y-3.5 shadow-sm">
             <h4 className="text-xs font-bold text-slate-900 border-b pb-2">সোশ্যাল সাপোর্ট লিঙ্ক কনফিগার</h4>
@@ -865,4 +1038,4 @@ export default function AdminApp() {
       </main>
     </div>
   );
-      }
+                          }
