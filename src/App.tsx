@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { db } from './firebase';
-import { ref, set, push, onValue, update, remove } from 'firebase/database';
+import { ref, set, push, onValue, update } from 'firebase/database';
 import { 
   ShieldCheck, 
   Users, 
@@ -41,7 +41,6 @@ import {
 
 export default function AdminApp() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [adminPhone] = useState('01728116153');
   const [adminPin, setAdminPin] = useState('');
   const [authError, setAuthError] = useState('');
 
@@ -56,21 +55,13 @@ export default function AdminApp() {
   const [cancellingOrder, setCancellingOrder] = useState<any | null>(null);
   const [cancelNote, setCancelNote] = useState('');
 
-  const [selectedOperatorFilter, setSelectedOperatorFilter] = useState('Grameenphone');
-  const [editingOffer, setEditingOffer] = useState<any | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-
   const [runningNotice, setRunningNotice] = useState('🎉 স্বাগতম SIM OFFER SHOP এ!');
   const [noticeInput, setNoticeInput] = useState(runningNotice);
   const [soundAlertEnabled, setSoundAlertEnabled] = useState(true);
 
-  // ব্রডকাস্ট ও পার্সোনাল নোটিফিকেশন স্টেট
-  const [broadcastType, setBroadcastType] = useState<'all' | 'personal'>('all');
-  const [targetPhone, setTargetPhone] = useState('');
-  const [broadcastMsg, setBroadcastMsg] = useState('');
-
   const [scratchCardsList, setScratchCardsList] = useState<any[]>([]);
-  const [newCard, setNewCard] = useState({ type: 'Minute', title: '', price: '', pin: '' });
+  const [newCard, setNewCard] = useState({ type: 'Minute', title: '', price: '' });
   const [popupAlert, setPopupAlert] = useState<string | null>(null);
 
   const [usersList, setUsersList] = useState<any[]>([]);
@@ -91,7 +82,6 @@ export default function AdminApp() {
 
   // Firebase Data Synchronization
   useEffect(() => {
-    // Users Sync
     onValue(ref(db, 'users'), (snapshot) => {
       const data = snapshot.val();
       if (data) {
@@ -104,7 +94,6 @@ export default function AdminApp() {
       }
     });
 
-    // Offers Sync
     onValue(ref(db, 'offers'), (snapshot) => {
       const data = snapshot.val();
       if (data) {
@@ -115,7 +104,6 @@ export default function AdminApp() {
       }
     });
 
-    // Notice Sync
     onValue(ref(db, 'settings/notice'), (snapshot) => {
       const val = snapshot.val();
       if (val) {
@@ -124,7 +112,6 @@ export default function AdminApp() {
       }
     });
 
-    // Add Money Settings & Logs Sync
     onValue(ref(db, 'settings/addMoney'), (snapshot) => {
       const val = snapshot.val();
       if (val) {
@@ -142,7 +129,6 @@ export default function AdminApp() {
       }
     });
 
-    // Recharge Orders Sync
     onValue(ref(db, 'rechargeOrders'), (snapshot) => {
       const data = snapshot.val();
       if (data) {
@@ -152,7 +138,6 @@ export default function AdminApp() {
       }
     });
 
-    // Drive Orders Sync
     onValue(ref(db, 'driveOrders'), (snapshot) => {
       const data = snapshot.val();
       if (data) {
@@ -162,7 +147,6 @@ export default function AdminApp() {
       }
     });
 
-    // Scratch Cards Sync
     onValue(ref(db, 'scratchCards'), (snapshot) => {
       const data = snapshot.val();
       if (data) {
@@ -191,18 +175,14 @@ export default function AdminApp() {
   };
 
   const onlineCount = appStats.onlineNowList.length;
-
   const pendingRechargeCount = rechargeOrders.filter(o => o.status === 'Pending').length;
   const pendingDriveCount = driveOrders.filter(o => o.status === 'Pending').length;
+  const pendingAddMoneyCount = addMoneyLogs.filter(o => o.status === 'Pending').length;
 
   const handleBack = () => {
     if (cancellingOrder) {
       setCancellingOrder(null);
       setCancelNote('');
-    } else if (editingOffer) {
-      setEditingOffer(null);
-    } else if (editingUser) {
-      setEditingUser(null);
     } else if (selectedUser) {
       setSelectedUser(null);
     } else if (activeSection !== 'menu') {
@@ -212,7 +192,7 @@ export default function AdminApp() {
 
   useEffect(() => {
     const backListener = CapacitorApp.addListener('backButton', () => {
-      if (cancellingOrder || editingOffer || editingUser || selectedUser || activeSection !== 'menu') {
+      if (cancellingOrder || selectedUser || activeSection !== 'menu') {
         handleBack();
       } else {
         CapacitorApp.exitApp();
@@ -221,7 +201,7 @@ export default function AdminApp() {
     return () => {
       backListener.then(handler => handler.remove());
     };
-  }, [cancellingOrder, editingOffer, editingUser, selectedUser, activeSection]);
+  }, [cancellingOrder, selectedUser, activeSection]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -278,18 +258,48 @@ export default function AdminApp() {
   };
 
   const handleAddNewCard = () => {
-    if (!newCard.title || !newCard.price || !newCard.pin) return alert('সব পূরণ করুন');
+    if (!newCard.title || !newCard.price) return alert('সব পূরণ করুন');
+    const randomPin = Math.floor(1000 + Math.random() * 9000).toString();
     const newRef = push(ref(db, 'scratchCards'));
     set(newRef, {
-      ...newCard,
-      price: Number(newCard.price)
+      type: newCard.type,
+      title: newCard.title,
+      price: Number(newCard.price),
+      pin: randomPin
     });
-    setNewCard({ type: 'Minute', title: '', price: '', pin: '' });
+    setNewCard({ type: 'Minute', title: '', price: '' });
     alert('কার্ড তৈরি হয়েছে!');
   };
 
   const completeRechargeOrder = (id: string) => {
     update(ref(db, `rechargeOrders/${id}`), { status: 'Completed' });
+  };
+
+  const handleApproveAddMoney = (log: any) => {
+    const targetUserId = log.userId || '1';
+    const userRef = ref(db, `users/${targetUserId}`);
+    
+    onValue(userRef, (snapshot) => {
+      const userData = snapshot.val();
+      if (userData) {
+        const currentBal = log.balanceType === 'drive' ? (userData.driveBalance || 0) : (userData.mainBalance || 0);
+        const newBal = currentBal + Number(log.amount);
+        
+        if (log.balanceType === 'drive') {
+          update(userRef, { driveBalance: newBal });
+        } else {
+          update(userRef, { mainBalance: newBal });
+        }
+      }
+    }, { onlyOnce: true });
+
+    update(ref(db, `addMoneyLogs/${log.id}`), { status: 'Approved' });
+    alert('✅ এড-মানি সফলভাবে অ্যাপ্রুভ করা হয়েছে এবং ইউজারের ব্যালেন্সে টাকা যোগ হয়েছে!');
+  };
+
+  const handleCancelAddMoney = (id: string) => {
+    update(ref(db, `addMoneyLogs/${id}`), { status: 'Cancelled' });
+    alert('❌ এড-মানি রিকোয়েস্ট ক্যানসেল করা হয়েছে।');
   };
 
   const submitCancelOrder = (type: 'recharge' | 'drive') => {
@@ -424,7 +434,12 @@ export default function AdminApp() {
                 <span className="text-[9px] text-slate-400">অফার ও সিম ম্যানেজ</span>
               </button>
 
-              <button onClick={() => setActiveSection('history')} className="bg-white border rounded-2xl p-3 flex flex-col items-center text-center shadow-sm active:scale-95">
+              <button onClick={() => setActiveSection('history')} className="bg-white border rounded-2xl p-3 flex flex-col items-center text-center shadow-sm active:scale-95 relative">
+                {pendingAddMoneyCount > 0 && (
+                  <span className="absolute top-2.5 right-2.5 bg-rose-600 text-white font-bold text-[10px] w-5 h-5 rounded-full flex items-center justify-center shadow-md animate-bounce">
+                    {pendingAddMoneyCount}
+                  </span>
+                )}
                 <div className="w-9 h-9 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center mb-1.5"><History className="w-4 h-4" /></div>
                 <span className="font-bold text-slate-900">History রিপোর্ট</span>
                 <span className="text-[9px] text-slate-400">সকল লেনদেন</span>
@@ -581,7 +596,6 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* ক্যানসেল নোট মডাল */}
         {cancellingOrder && (
           <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl p-4 max-w-xs w-full space-y-2.5 shadow-2xl">
@@ -595,7 +609,6 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* হিস্ট্রি অপশন */}
         {activeSection === 'history' && (
           <div className="space-y-3">
             <div className="grid grid-cols-3 gap-1 bg-slate-200 p-1 rounded-xl">
@@ -606,15 +619,28 @@ export default function AdminApp() {
 
             {historyTab === 'add_money' && (
               <div className="space-y-2">
-                <h4 className="font-bold text-slate-800 px-1">এড-মানি হিস্ট্রি রিপোর্ট</h4>
+                <h4 className="font-bold text-slate-800 px-1">এড-মানি হিস্ট্রি ও রিকোয়েস্ট</h4>
                 {addMoneyLogs.map(log => (
-                  <div key={log.id} className="bg-white border rounded-xl p-3 flex justify-between items-center shadow-sm">
-                    <div>
-                      <p className="font-bold text-slate-900">৳{log.amount} ({log.method})</p>
-                      <p className="text-[10px] text-slate-600">👤 {log.userName} (<span className="font-mono">{log.userPhone}</span>)</p>
-                      <p className="text-[10px] text-slate-400">TrxID: <strong className="font-mono text-indigo-600">{log.trxId}</strong> • {log.time}</p>
+                  <div key={log.id} className="bg-white border rounded-xl p-3 space-y-2 shadow-sm">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="font-bold text-slate-900">৳{log.amount} ({log.method}) - <span className="text-indigo-600 uppercase font-bold">{log.balanceType || 'main'} balance</span></p>
+                        <p className="text-[10px] text-slate-600">👤 {log.userName} (<span className="font-mono">{log.userPhone}</span>)</p>
+                        <p className="text-[10px] text-slate-400">TrxID: <strong className="font-mono text-indigo-600">{log.trxId}</strong> • {log.time}</p>
+                      </div>
+                      <span className={`text-[10px] font-bold px-2 py-1 rounded-lg ${log.status === 'Approved' ? 'bg-emerald-50 text-emerald-700' : log.status === 'Cancelled' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700'}`}>{log.status}</span>
                     </div>
-                    <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200">{log.status}</span>
+
+                    {log.status === 'Pending' && (
+                      <div className="flex gap-2 pt-1 border-t">
+                        <button onClick={() => handleApproveAddMoney(log)} className="flex-1 py-1.5 bg-emerald-600 text-white font-bold rounded-lg text-xs flex items-center justify-center gap-1">
+                          <CheckCircle className="w-3.5 h-3.5" /> Approve & Add Money
+                        </button>
+                        <button onClick={() => handleCancelAddMoney(log.id)} className="flex-1 py-1.5 bg-rose-600 text-white font-bold rounded-lg text-xs flex items-center justify-center gap-1">
+                          <XCircle className="w-3.5 h-3.5" /> Cancel
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -654,7 +680,6 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* এড মানি কন্ট্রোল */}
         {activeSection === 'add_money' && (
           <div className="space-y-3">
             <div className="bg-white border rounded-2xl p-3.5 flex items-center justify-between shadow-sm">
@@ -688,7 +713,6 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* স্ক্র্যাচ কার্ড */}
         {activeSection === 'scratch_cards' && (
           <div className="space-y-3">
             <div className="bg-white border rounded-2xl p-3.5 space-y-2.5 shadow-sm">
@@ -697,11 +721,8 @@ export default function AdminApp() {
                 <option value="Minute">Minute Card</option>
                 <option value="Internet">Internet Card</option>
               </select>
-              <input type="text" placeholder="টাইটেল" value={newCard.title} onChange={(e) => setNewCard({ ...newCard, title: e.target.value })} className="w-full bg-slate-50 border rounded-xl p-2" />
-              <div className="grid grid-cols-2 gap-2">
-                <input type="number" placeholder="মূল্য (৳)" value={newCard.price} onChange={(e) => setNewCard({ ...newCard, price: e.target.value })} className="bg-slate-50 border rounded-xl p-2 font-bold" />
-                <input type="text" placeholder="পিন কোড" value={newCard.pin} onChange={(e) => setNewCard({ ...newCard, pin: e.target.value })} className="bg-slate-50 border rounded-xl p-2 font-bold text-indigo-600" />
-              </div>
+              <input type="text" placeholder="টাইটেল (যেমন: ৫০ মিনিট প্যাক)" value={newCard.title} onChange={(e) => setNewCard({ ...newCard, title: e.target.value })} className="w-full bg-slate-50 border rounded-xl p-2" />
+              <input type="number" placeholder="মূল্য (৳)" value={newCard.price} onChange={(e) => setNewCard({ ...newCard, price: e.target.value })} className="w-full bg-slate-50 border rounded-xl p-2 font-bold" />
               <button onClick={handleAddNewCard} className="w-full py-2.5 bg-pink-600 text-white font-bold rounded-xl">পাবলিশ</button>
             </div>
 
@@ -722,7 +743,6 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* ইউজার ম্যানেজার */}
         {activeSection === 'users' && !selectedUser && (
           <div className="space-y-2.5">
             <div className="relative">
@@ -743,7 +763,6 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* ইউজার প্রোফাইল ও ব্যালেন্স মডিফাই */}
         {activeSection === 'users' && selectedUser && (
           <div className="space-y-3">
             <div className="bg-white border rounded-2xl p-3.5">
@@ -761,7 +780,6 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* লাইভ চ্যাট */}
         {activeSection === 'chats' && activeChatUser && (
           <div className="bg-white border rounded-2xl p-3 h-[420px] flex flex-col shadow-sm">
             <div className="border-b pb-2 mb-2 flex items-center justify-between">
@@ -814,7 +832,6 @@ export default function AdminApp() {
         )}
       </main>
 
-      {/* পপ-আপ অ্যালার্ট */}
       {popupAlert && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-5 max-w-xs w-full text-center space-y-3 shadow-2xl">
@@ -824,6 +841,6 @@ export default function AdminApp() {
           </div>
         </div>
       )}
-    </div>
+  </div>
   );
 }
