@@ -34,7 +34,8 @@ import {
   Ban,
   Ticket,
   Sparkles,
-  ListFilter
+  ListFilter,
+  UserCheck2
 } from 'lucide-react';
 
 export default function AdminApp() {
@@ -61,7 +62,11 @@ export default function AdminApp() {
   const [runningNotice, setRunningNotice] = useState('🎉 স্বাগতম SIM OFFER SHOP এ!');
   const [noticeInput, setNoticeInput] = useState(runningNotice);
   const [soundAlertEnabled, setSoundAlertEnabled] = useState(true);
-  const [broadcastMsg, setBroadcastMsg] = useState('');
+
+  // ব্রডকাস্ট ও পার্সোনাল নোটিফিকেশন স্টেট
+  const [broadcastType, setBroadcastType] = useState<'all' | 'personal'>('all');
+  const [targetPhone, setTargetPhone] = useState('');
+  const [personalMsg, setPersonalMsg] = useState('');
 
   const [scratchCardsList, setScratchCardsList] = useState([
     { id: 'SC-1', type: 'Minute', title: '50 মিনিট প্যাক', price: 30, pin: '*123*88493021#' }
@@ -90,19 +95,16 @@ export default function AdminApp() {
 
   const onlineCount = appStats.onlineNowList.length;
 
-  // পূর্ণাঙ্গ এড-মানি হিস্ট্রি লগ
   const [addMoneyLogs, setAddMoneyLogs] = useState([
-    { id: 'AM-101', userName: 'User', userPhone: '01728116153', method: 'bKash', amount: 1000, balanceType: 'main', trxId: 'BK990011', time: '10:30 AM', status: 'Approved' },
-    { id: 'AM-102', userName: 'Rakib Telecom', userPhone: '01844556677', method: 'Nagad', amount: 500, balanceType: 'drive', trxId: 'NG554433', time: '11:15 AM', status: 'Approved' }
+    { id: 'AM-101', userName: 'User', userPhone: '01728116153', method: 'bKash', amount: 1000, balanceType: 'main', trxId: 'BK990011', time: '10:30 AM', status: 'Approved' }
   ]);
 
   const [rechargeOrders, setRechargeOrders] = useState([
-    { id: 'RCH-101', userId: '1', userName: 'User', userPhone: '01728116153', userMainBal: 1400, userDriveBal: 3870, operator: 'Grameenphone', amount: 200, targetNumber: '01711223344', time: '10:45 AM', status: 'Completed', note: '' },
-    { id: 'RCH-102', userId: '2', userName: 'Rakib Telecom', userPhone: '01844556677', userMainBal: 500, userDriveBal: 1200, operator: 'Robi', amount: 300, targetNumber: '01811223344', time: '11:00 AM', status: 'Pending', note: '' }
+    { id: 'RCH-101', userId: '1', userName: 'User', userPhone: '01728116153', userMainBal: 1400, userDriveBal: 3870, operator: 'Grameenphone', amount: 200, targetNumber: '01711223344', time: '10:45 AM', status: 'Pending', note: '' }
   ]);
 
   const [driveOrders, setDriveOrders] = useState([
-    { id: 'DRV-201', userId: '1', userName: 'User', userPhone: '01728116153', userMainBal: 1400, userDriveBal: 3870, operator: 'Grameenphone', packageTitle: '30 GB + 700 Min', price: 580, targetNumber: '01711223344', time: '12:00 PM', status: 'Completed', hasLoan: false, note: '' }
+    { id: 'DRV-201', userId: '1', userName: 'User', userPhone: '01728116153', userMainBal: 1400, userDriveBal: 3870, operator: 'Grameenphone', packageTitle: '30 GB + 700 Min', price: 580, targetNumber: '01711223344', time: '12:00 PM', status: 'Pending', hasLoan: false, note: '' }
   ]);
 
   const pendingRechargeCount = rechargeOrders.filter(o => o.status === 'Pending').length;
@@ -135,10 +137,6 @@ export default function AdminApp() {
       backListener.then(handler => handler.remove());
     };
   }, [cancellingOrder, editingOffer, editingUser, selectedUser, activeSection]);
-
-  const [operatorStatus, setOperatorStatus] = useState<Record<string, boolean>>({
-    Grameenphone: true, Robi: true, Banglalink: true, Airtel: true, Teletalk: false
-  });
 
   const [usersList, setUsersList] = useState([
     { id: '1', name: 'User', phone: '01728116153', pin: '1234', mainBalance: 1400, driveBalance: 3870, isBanned: false },
@@ -203,13 +201,6 @@ export default function AdminApp() {
     setOffers(prev => [...prev, { id: Date.now().toString(), ...newOffer, offerPrice: Number(newOffer.offerPrice), cashback: Number(newOffer.cashback) || 0, profit: Number(newOffer.profit) || 0 }]);
     setNewOffer({ operator: 'Grameenphone', title: '', offerPrice: '', cashback: '', profit: '', note: '' });
     alert('পাবলিশ হয়েছে!');
-  };
-
-  const handleSaveEditedOffer = () => {
-    if (!editingOffer) return;
-    setOffers(prev => prev.map(o => o.id === editingOffer.id ? editingOffer : o));
-    setEditingOffer(null);
-    alert('মডিফাই সফল হয়েছে!');
   };
 
   const handleAddNewCard = () => {
@@ -371,6 +362,122 @@ export default function AdminApp() {
           </div>
         )}
 
+        {/* উন্নত রানিং ও পার্সোনাল নোটিশ ব্রডকাস্ট পেজ */}
+        {activeSection === 'broadcast' && (
+          <div className="space-y-3">
+            {/* রানিং নোটিশ আপডেট */}
+            <div className="bg-white border rounded-2xl p-3.5 space-y-2.5 shadow-sm">
+              <h4 className="font-bold text-slate-900 border-b pb-1.5">রানিং নোটিশ আপডেট (App Marquee)</h4>
+              <input type="text" value={noticeInput} onChange={(e) => setNoticeInput(e.target.value)} className="w-full bg-slate-50 border rounded-xl p-2.5 font-medium" />
+              <button onClick={() => { setRunningNotice(noticeInput); alert('রানিং নোটিশ আপডেট হয়েছে!'); }} className="w-full py-2.5 bg-indigo-600 text-white font-bold rounded-xl">আপডেট করুন</button>
+            </div>
+
+            {/* ব্রডকাস্ট টাইপ সিলেক্টর (সবার জন্য নাকি পার্সোনাল) */}
+            <div className="bg-white border rounded-2xl p-3.5 space-y-3 shadow-sm">
+              <h4 className="font-bold text-slate-900 border-b pb-1.5 flex items-center gap-1.5">
+                <BellRing className="w-4 h-4 text-indigo-600" /> নোটিফিকেশন ও মেসেজ সেন্ডার
+              </h4>
+
+              <div className="grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded-xl">
+                <button 
+                  onClick={() => setBroadcastType('all')} 
+                  className={`py-2 rounded-lg font-bold transition-all ${broadcastType === 'all' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600'}`}
+                >
+                  🌐 সবাইকে পাঠান
+                </button>
+                <button 
+                  onClick={() => setBroadcastType('personal')} 
+                  className={`py-2 rounded-lg font-bold transition-all ${broadcastType === 'personal' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600'}`}
+                >
+                  👤 পার্সোনাল (নির্দিষ্ট কাউকে)
+                </button>
+              </div>
+
+              {broadcastType === 'personal' && (
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 block mb-1">গ্রাহকের মোবাইল নম্বর বা সিলেক্ট করুন</label>
+                  <select 
+                    value={targetPhone} 
+                    onChange={(e) => setTargetPhone(e.target.value)} 
+                    className="w-full bg-slate-50 border rounded-xl p-2.5 font-bold text-xs"
+                  >
+                    <option value="">-- গ্রাহক সিলেক্ট করুন --</option>
+                    {usersList.map(u => (
+                      <option key={u.id} value={u.phone}>{u.name} ({u.phone})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 block mb-1">নোটিফিকেশন মেসেজ লিখুন</label>
+                <textarea 
+                  placeholder={broadcastType === 'all' ? "সকল ইউজারের জন্য নোটিশ লিখুন..." : "নির্দিষ্ট গ্রাহকের জন্য পার্সোনাল মেসেজ লিখুন..."} 
+                  value={broadcastMsg} 
+                  onChange={(e) => setBroadcastMsg(e.target.value)} 
+                  className="w-full bg-slate-50 border rounded-xl p-2.5 h-24 focus:outline-none focus:border-indigo-600" 
+                />
+              </div>
+
+              <button 
+                onClick={() => {
+                  if (!broadcastMsg.trim()) return alert('মেসেজের লেখা লিখুন!');
+                  if (broadcastType === 'personal' && !targetPhone) return alert('দয়া করে নির্দিষ্ট গ্রাহক বা নম্বর সিলেক্ট করুন!');
+                  
+                  if (broadcastType === 'all') {
+                    alert('সফলভাবে সকল ইউজারের কাছে নোটিফিকেশন পাঠানো হয়েছে!');
+                  } else {
+                    alert(`সফলভাবে ${targetPhone} নম্বরে পার্সোনাল নোটিফিকেশন পাঠানো হয়েছে!`);
+                  }
+                  setBroadcastMsg('');
+                  setTargetPhone('');
+                }} 
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md flex items-center justify-center gap-1.5"
+              >
+                <Send className="w-4 h-4" /> নোটিফিকেশন সেন্ড করুন
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ড্রাইভ প্যাক কন্ট্রোল */}
+        {activeSection === 'offers' && (
+          <div className="space-y-3">
+            <div className="bg-white border rounded-2xl p-3.5 space-y-2.5 shadow-sm">
+              <h4 className="font-bold text-slate-900 border-b pb-1.5 flex items-center gap-1">
+                <Flame className="w-3.5 h-3.5 text-rose-500" /> নতুন ড্রাইভ অফার যোগ করুন
+              </h4>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 block mb-0.5">সিম অপারেটর</label>
+                <select value={newOffer.operator} onChange={(e) => setNewOffer({ ...newOffer, operator: e.target.value })} className="w-full bg-slate-50 border rounded-xl p-2 font-bold">
+                  <option value="Grameenphone">Grameenphone (GP)</option>
+                  <option value="Robi">Robi</option>
+                  <option value="Banglalink">Banglalink (BL)</option>
+                  <option value="Airtel">Airtel</option>
+                  <option value="Teletalk">Teletalk</option>
+                </select>
+              </div>
+              <input type="text" placeholder="টাইটেল (যেমন: 30 GB + 700 Min)" value={newOffer.title} onChange={(e) => setNewOffer({ ...newOffer, title: e.target.value })} className="w-full bg-slate-50 border rounded-xl p-2" />
+              <div className="grid grid-cols-3 gap-1.5">
+                <div>
+                  <label className="text-[9px] text-slate-400 block mb-0.5">মূল্য (৳)</label>
+                  <input type="number" placeholder="580" value={newOffer.offerPrice} onChange={(e) => setNewOffer({ ...newOffer, offerPrice: e.target.value })} className="w-full bg-slate-50 border rounded-xl p-2 font-bold" />
+                </div>
+                <div>
+                  <label className="text-[9px] text-slate-400 block mb-0.5">কমিশন (৳)</label>
+                  <input type="number" placeholder="120" value={newOffer.cashback} onChange={(e) => setNewOffer({ ...newOffer, cashback: e.target.value })} className="w-full bg-slate-50 border rounded-xl p-2 font-bold text-emerald-600" />
+                </div>
+                <div>
+                  <label className="text-[9px] text-slate-400 block mb-0.5">লাভ (৳)</label>
+                  <input type="number" placeholder="45" value={newOffer.profit} onChange={(e) => setNewOffer({ ...newOffer, profit: e.target.value })} className="w-full bg-slate-50 border rounded-xl p-2 font-bold text-indigo-600" />
+                </div>
+              </div>
+              <input type="text" placeholder="নোট (যেমন: শুধু ঢাকা বিভাগ)" value={newOffer.note} onChange={(e) => setNewOffer({ ...newOffer, note: e.target.value })} className="w-full bg-slate-50 border rounded-xl p-2 text-xs" />
+              <button onClick={handleAddOffer} className="w-full py-2.5 bg-emerald-600 text-white font-bold rounded-xl shadow-md">অফার পাবলিশ করুন</button>
+            </div>
+          </div>
+        )}
+
         {/* রিচার্জ অর্ডার */}
         {activeSection === 'recharge_orders' && (
           <div className="space-y-3">
@@ -461,115 +568,6 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* ড্রাইভ প্যাক কন্ট্রোল */}
-        {activeSection === 'offers' && (
-          <div className="space-y-3">
-            <div className="bg-white border rounded-2xl p-3.5 space-y-2.5 shadow-sm">
-              <h4 className="font-bold text-slate-900 border-b pb-1.5 flex items-center gap-1">
-                <Flame className="w-3.5 h-3.5 text-rose-500" /> নতুন ড্রাইভ অফার যোগ করুন
-              </h4>
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 block mb-0.5">সিম অপারেটর</label>
-                <select value={newOffer.operator} onChange={(e) => setNewOffer({ ...newOffer, operator: e.target.value })} className="w-full bg-slate-50 border rounded-xl p-2 font-bold">
-                  <option value="Grameenphone">Grameenphone (GP)</option>
-                  <option value="Robi">Robi</option>
-                  <option value="Banglalink">Banglalink (BL)</option>
-                  <option value="Airtel">Airtel</option>
-                  <option value="Teletalk">Teletalk</option>
-                </select>
-              </div>
-              <input type="text" placeholder="টাইটেল (যেমন: 30 GB + 700 Min)" value={newOffer.title} onChange={(e) => setNewOffer({ ...newOffer, title: e.target.value })} className="w-full bg-slate-50 border rounded-xl p-2" />
-              <div className="grid grid-cols-3 gap-1.5">
-                <div>
-                  <label className="text-[9px] text-slate-400 block mb-0.5">মূল্য (৳)</label>
-                  <input type="number" placeholder="580" value={newOffer.offerPrice} onChange={(e) => setNewOffer({ ...newOffer, offerPrice: e.target.value })} className="w-full bg-slate-50 border rounded-xl p-2 font-bold" />
-                </div>
-                <div>
-                  <label className="text-[9px] text-slate-400 block mb-0.5">কমিশন (৳)</label>
-                  <input type="number" placeholder="120" value={newOffer.cashback} onChange={(e) => setNewOffer({ ...newOffer, cashback: e.target.value })} className="w-full bg-slate-50 border rounded-xl p-2 font-bold text-emerald-600" />
-                </div>
-                <div>
-                  <label className="text-[9px] text-slate-400 block mb-0.5">লাভ (৳)</label>
-                  <input type="number" placeholder="45" value={newOffer.profit} onChange={(e) => setNewOffer({ ...newOffer, profit: e.target.value })} className="w-full bg-slate-50 border rounded-xl p-2 font-bold text-indigo-600" />
-                </div>
-              </div>
-              <input type="text" placeholder="নোট (যেমন: শুধু ঢাকা বিভাগ)" value={newOffer.note} onChange={(e) => setNewOffer({ ...newOffer, note: e.target.value })} className="w-full bg-slate-50 border rounded-xl p-2 text-xs" />
-              <button onClick={handleAddOffer} className="w-full py-2.5 bg-emerald-600 text-white font-bold rounded-xl shadow-md">অফার পাবলিশ করুন</button>
-            </div>
-
-            <div className="bg-white border rounded-2xl p-3.5 space-y-2.5 shadow-sm">
-              <div className="flex justify-between items-center border-b pb-1.5">
-                <h4 className="font-bold text-slate-800 flex items-center gap-1"><ListFilter className="w-3.5 h-3.5 text-indigo-600" /> অফারগুলো দেখুন</h4>
-                <select
-                  value={selectedOperatorFilter}
-                  onChange={(e) => setSelectedOperatorFilter(e.target.value)}
-                  className="bg-slate-100 border rounded-xl px-2.5 py-1 text-xs font-bold text-indigo-700 focus:outline-none"
-                >
-                  <option value="Grameenphone">GP</option>
-                  <option value="Robi">Robi</option>
-                  <option value="Banglalink">Banglalink</option>
-                  <option value="Airtel">Airtel</option>
-                  <option value="Teletalk">Teletalk</option>
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                {visibleOffers.length === 0 ? (
-                  <div className="p-4 text-center text-slate-400">এই সিমের জন্য কোনো অফার নেই</div>
-                ) : (
-                  visibleOffers.map((of) => (
-                    <div key={of.id} className="bg-slate-50 border rounded-xl p-2.5 flex items-start justify-between">
-                      <div className="space-y-0.5">
-                        <h5 className="font-bold text-slate-900">{of.title}</h5>
-                        <p className="text-[10px] text-slate-600">মূল্য: ৳{of.offerPrice} | কমিশন: ৳{of.cashback} | লাভ: ৳{of.profit}</p>
-                        {of.note && <p className="text-[9px] text-indigo-600 font-medium">📌 {of.note}</p>}
-                      </div>
-                      <div className="flex gap-1 shrink-0">
-                        <button onClick={() => setEditingOffer(of)} className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg"><Edit3 className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => setOffers(offers.filter(o => o.id !== of.id))} className="p-1.5 bg-rose-50 text-rose-600 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {editingOffer && (
-              <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-                <div className="bg-white rounded-3xl p-4 max-w-xs w-full space-y-2.5 shadow-2xl">
-                  <h4 className="font-bold text-slate-900 border-b pb-1.5">অফার মডিফাই বা এডিট করুন</h4>
-                  <div>
-                    <label className="text-[9px] font-bold text-slate-500 block mb-0.5">টাইটেল</label>
-                    <input type="text" value={editingOffer.title} onChange={(e) => setEditingOffer({ ...editingOffer, title: e.target.value })} className="w-full bg-slate-50 border rounded-xl p-2 text-xs" />
-                  </div>
-                  <div className="grid grid-cols-3 gap-1">
-                    <div>
-                      <label className="text-[9px] font-bold text-slate-500 block mb-0.5">মূল্য</label>
-                      <input type="number" value={editingOffer.offerPrice} onChange={(e) => setEditingOffer({ ...editingOffer, offerPrice: Number(e.target.value) })} className="w-full bg-slate-50 border rounded-xl p-2 text-xs font-mono font-bold" />
-                    </div>
-                    <div>
-                      <label className="text-[9px] font-bold text-slate-500 block mb-0.5">কমিশন</label>
-                      <input type="number" value={editingOffer.cashback} onChange={(e) => setEditingOffer({ ...editingOffer, cashback: Number(e.target.value) })} className="w-full bg-slate-50 border rounded-xl p-2 text-xs font-mono font-bold text-emerald-600" />
-                    </div>
-                    <div>
-                      <label className="text-[9px] font-bold text-slate-500 block mb-0.5">লাভ</label>
-                      <input type="number" value={editingOffer.profit} onChange={(e) => setEditingOffer({ ...editingOffer, profit: Number(e.target.value) })} className="w-full bg-slate-50 border rounded-xl p-2 text-xs font-mono font-bold text-indigo-600" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-[9px] font-bold text-slate-500 block mb-0.5">নোট</label>
-                    <input type="text" value={editingOffer.note} onChange={(e) => setEditingOffer({ ...editingOffer, note: e.target.value })} className="w-full bg-slate-50 border rounded-xl p-2 text-xs" />
-                  </div>
-                  <div className="flex gap-2 pt-1">
-                    <button onClick={() => setEditingOffer(null)} className="flex-1 py-2 bg-slate-100 rounded-xl font-bold">বাতিল</button>
-                    <button onClick={handleSaveEditedOffer} className="flex-1 py-2 bg-indigo-600 text-white font-bold rounded-xl">সেভ করুন</button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* ক্যানসেল নোট মডাল */}
         {cancellingOrder && (
           <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
@@ -584,7 +582,7 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* উন্নত History অপশন (যেখানে কে কত টাকা এড করেছে এবং কোন ইউজার রিচার্জ/ড্রাইভ দিল তার পূর্ণাঙ্গ রিপোর্ট থাকবে) */}
+        {/* হিস্ট্রি অপশন */}
         {activeSection === 'history' && (
           <div className="space-y-3">
             <div className="grid grid-cols-3 gap-1 bg-slate-200 p-1 rounded-xl">
@@ -765,15 +763,6 @@ export default function AdminApp() {
               <input type="text" placeholder="উত্তর..." value={replyText} onChange={(e) => setReplyText(e.target.value)} className="flex-1 bg-slate-50 border rounded-xl px-3 py-1.5" />
               <button onClick={() => { if(replyText){ setChatMessages([...chatMessages, {sender:'admin', text:replyText}]); setReplyText(''); } }} className="p-2 bg-indigo-600 text-white rounded-xl"><Send className="w-3.5 h-3.5" /></button>
             </div>
-          </div>
-        )}
-
-        {/* ব্রডকাস্ট নোটিশ */}
-        {activeSection === 'broadcast' && (
-          <div className="bg-white border rounded-2xl p-3.5 space-y-2.5">
-            <h4 className="font-bold text-slate-900 border-b pb-1.5">রানিং নোটিশ আপডেট</h4>
-            <input type="text" value={noticeInput} onChange={(e) => setNoticeInput(e.target.value)} className="w-full bg-slate-50 border rounded-xl p-2.5 font-medium" />
-            <button onClick={() => { setRunningNotice(noticeInput); alert('আপডেট হয়েছে!'); }} className="w-full py-2.5 bg-indigo-600 text-white font-bold rounded-xl">আপডেট</button>
           </div>
         )}
       </main>
