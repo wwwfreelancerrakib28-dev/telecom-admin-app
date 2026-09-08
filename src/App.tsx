@@ -38,7 +38,7 @@ export default function AdminApp() {
   const [customDriveBalance, setCustomDriveBalance] = useState('');
   const [editingUser, setEditingUser] = useState<any | null>(null);
 
-  // ব্যাক বাটন হ্যান্ডলার (এক জায়গায় রাখা হয়েছে যাতে সব জায়গা থেকে একই নিয়মে কাজ করে)
+  // ব্যাক বাটন হ্যান্ডলার
   const handleBack = () => {
     if (editingUser) {
       setEditingUser(null);
@@ -49,7 +49,7 @@ export default function AdminApp() {
     }
   };
 
-  // মোবাইলের নিচের ব্যাক বাটন কাজ করানোর ইভেন্ট লিসেনার
+  // মোবাইলের নিচের ব্যাক বাটন লিসেনার
   useEffect(() => {
     const backListener = CapacitorApp.addListener('backButton', () => {
       if (editingUser || selectedUser || activeSection !== 'menu') {
@@ -279,12 +279,16 @@ export default function AdminApp() {
           </div>
         </div>
 
-        <button 
-          onClick={() => setIsAuthenticated(false)}
-          className="p-2 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 active:scale-95 transition-all"
-        >
-          <LogOut className="w-5 h-5" />
-        </button>
+        {/* শুধু হোম পেজে থাকলেই লগআউট বাটন দেখাবে */}
+        {activeSection === 'menu' && !selectedUser && (
+          <button 
+            onClick={() => setIsAuthenticated(false)}
+            className="p-2 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 active:scale-95 transition-all"
+            title="লগআউট"
+          >
+            <LogOut className="w-5 h-5" />
+          </button>
+        )}
       </header>
 
       <main className="flex-1 p-4 max-w-lg mx-auto w-full overflow-y-auto">
@@ -761,4 +765,4 @@ export default function AdminApp() {
       </main>
     </div>
   );
-}
+                                                          }
