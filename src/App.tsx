@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { db } from './firebase';
-import { ref, set, push, onValue, update } from 'firebase/database';
+import { ref, set, push, onValue, update, remove } from 'firebase/database';
 import { 
   ShieldCheck, 
   Users, 
@@ -37,8 +37,6 @@ import {
   Ticket,
   Sparkles,
   ListFilter,
-  Facebook,
-  MessageCircle,
   Globe
 } from 'lucide-react';
 
@@ -62,13 +60,21 @@ export default function AdminApp() {
   const [noticeInput, setNoticeInput] = useState(runningNotice);
   const [soundAlertEnabled, setSoundAlertEnabled] = useState(true);
 
-  // সোশ্যাল লিংক স্টেট
+  // মাস্টার ড্রাইভ ও সিম কন্ট্রোল স্টেট
+  const [masterDriveStatus, setMasterDriveStatus] = useState(true);
+  const [simControlStatus, setSimControlStatus] = useState<Record<string, boolean>>({
+    Grameenphone: true,
+    Robi: true,
+    Banglalink: true,
+    Airtel: true,
+    Teletalk: true
+  });
+
   const [socialLinks, setSocialLinks] = useState({
     facebookPage: 'https://facebook.com/yourpage',
     whatsappNumber: '+8801728116153'
   });
 
-  // ব্রডকাস্ট স্টেট
   const [broadcastType, setBroadcastType] = useState<'all' | 'personal'>('all');
   const [targetPhone, setTargetPhone] = useState('');
   const [broadcastMsg, setBroadcastMsg] = useState('');
@@ -131,6 +137,16 @@ export default function AdminApp() {
       }
     });
 
+    onValue(ref(db, 'settings/masterDriveStatus'), (snapshot) => {
+      const val = snapshot.val();
+      if (val !== null) setMasterDriveStatus(val);
+    });
+
+    onValue(ref(db, 'settings/simControlStatus'), (snapshot) => {
+      const val = snapshot.val();
+      if (val) setSimControlStatus(val);
+    });
+
     onValue(ref(db, 'settings/socialLinks'), (snapshot) => {
       const val = snapshot.val();
       if (val) setSocialLinks(val);
@@ -178,6 +194,25 @@ export default function AdminApp() {
       }
     });
   }, [activeChatUser]);
+
+  const handleToggleMasterDrive = () => {
+    const newState = !masterDriveStatus;
+    setMasterDriveStatus(newState);
+    set(ref(db, 'settings/masterDriveStatus'), newState);
+  };
+
+  const handleToggleSim = (simName: string) => {
+    const updated = { ...simControlStatus, [simName]: !simControlStatus[simName] };
+    setSimControlStatus(updated);
+    set(ref(db, 'settings/simControlStatus'), updated);
+  };
+
+  const handleDeleteOffer = (id: string) => {
+    if (window.confirm('আপনি কি এই অফারটি ডিলিট করতে চান?')) {
+      remove(ref(db, `offers/${id}`));
+      alert('অফার সফলভাবে ডিলিট করা হয়েছে!');
+    }
+  };
 
   const handleSendAdminChat = () => {
     if (!replyText.trim() || !activeChatUser) return;
@@ -307,7 +342,7 @@ export default function AdminApp() {
       profit: Number(newOffer.profit) || 0
     });
     setNewOffer({ operator: 'Grameenphone', title: '', offerPrice: '', cashback: '', profit: '', note: '' });
-    alert('পাবলিশ হয়েছে!');
+    alert('অফার পাবলিশ হয়েছে!');
   };
 
   const handleAddNewCard = () => {
@@ -528,7 +563,7 @@ export default function AdminApp() {
               <label className="text-[10px] font-bold text-slate-600 block mb-1">হোয়াটসঅ্যাপ নম্বর</label>
               <input type="text" value={socialLinks.whatsappNumber} onChange={(e) => setSocialLinks({ ...socialLinks, whatsappNumber: e.target.value })} className="w-full bg-slate-50 border rounded-xl p-2.5 font-medium" />
             </div>
-            <button onClick={handleUpdateSocialLinks} className="w-full py-2.5 bg-indigo-600 text-white font-bold rounded-xl shadow-md">লিংকগুলো সেভ করুন</button>
+            <button onClick={updateAddMoneySettings} className="w-full py-2.5 bg-indigo-600 text-white font-bold rounded-xl shadow-md">লিংকগুলো সেভ করুন</button>
           </div>
         )}
 
@@ -574,20 +609,58 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* ড্রাইভ প্যাক কন্ট্রোল */}
+        {/* ড্রাইভ প্যাক কন্ট্রোল (মাস্টার সুইচ, সিম অন/অফ, নতুন অফার ও লিস্ট) */}
         {activeSection === 'offers' && (
           <div className="space-y-3">
+            {/* মাস্টার ড্রাইভ অন/অফ সুইচ */}
+            <div className="bg-white border rounded-2xl p-3.5 flex items-center justify-between shadow-sm">
+              <div>
+                <h4 className="font-bold text-slate-900">সার্বক্ষণিক ড্রাইভ সার্ভিস (Master Drive)</h4>
+                <p className="text-[10px] text-slate-400">বন্ধ করলে ইউজার অ্যাপে আজ সারাদিনের ড্রাইভ বন্ধ দেখাবে</p>
+              </div>
+              <button onClick={handleToggleMasterDrive}>
+                {masterDriveStatus ? <ToggleRight className="w-7 h-7 text-emerald-600" /> : <ToggleLeft className="w-7 h-7 text-rose-600" />}
+              </button>
+            </div>
+
+            {/* নির্দিষ্ট সিম অন/অফ কন্ট্রোল */}
+            <div className="bg-white border rounded-2xl p-3.5 space-y-2 shadow-sm">
+              <h4 className="font-bold text-slate-900 border-b pb-1.5">নির্দিষ্ট সিম ভিত্তিক অফার অন/অফ</h4>
+              <div className="grid grid-cols-2 gap-2">
+                {Object.keys(simControlStatus).map((sim) => (
+                  <div key={sim} className="flex items-center justify-between bg-slate-50 border p-2 rounded-xl">
+                    <span className="font-bold text-slate-800">{sim}</span>
+                    <button onClick={() => handleToggleSim(sim)}>
+                      {simControlStatus[sim] ? <ToggleRight className="w-6 h-6 text-emerald-600" /> : <ToggleLeft className="w-6 h-6 text-rose-600" />}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* নতুন অফার যোগ করুন */}
             <div className="bg-white border rounded-2xl p-3.5 space-y-2.5 shadow-sm">
               <h4 className="font-bold text-slate-900 border-b pb-1.5 flex items-center gap-1">
                 <Flame className="w-3.5 h-3.5 text-rose-500" /> নতুন ড্রাইভ অফার যোগ করুন
               </h4>
-              <select value={newOffer.operator} onChange={(e) => setNewOffer({ ...newOffer, operator: e.target.value })} className="w-full bg-slate-50 border rounded-xl p-2 font-bold">
-                <option value="Grameenphone">Grameenphone (GP)</option>
-                <option value="Robi">Robi</option>
-                <option value="Banglalink">Banglalink (BL)</option>
-                <option value="Airtel">Airtel</option>
-                <option value="Teletalk">Teletalk</option>
-              </select>
+
+              {/* সিম লোগো বাটন সিলেকশন */}
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 block mb-1">অপারেটর সিলেক্ট করুন</label>
+                <div className="grid grid-cols-5 gap-1">
+                  {['Grameenphone', 'Robi', 'Banglalink', 'Airtel', 'Teletalk'].map((op) => (
+                    <button
+                      key={op}
+                      type="button"
+                      onClick={() => setNewOffer({ ...newOffer, operator: op })}
+                      className={`py-2 rounded-xl text-[10px] font-black border transition-all ${newOffer.operator === op ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-700'}`}
+                    >
+                      {op === 'Grameenphone' ? 'GP' : op === 'Banglalink' ? 'BL' : op}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <input type="text" placeholder="টাইটেল (যেমন: 30 GB + 700 Min)" value={newOffer.title} onChange={(e) => setNewOffer({ ...newOffer, title: e.target.value })} className="w-full bg-slate-50 border rounded-xl p-2" />
               <div className="grid grid-cols-3 gap-1.5">
                 <input type="number" placeholder="মূল্য (৳)" value={newOffer.offerPrice} onChange={(e) => setNewOffer({ ...newOffer, offerPrice: e.target.value })} className="bg-slate-50 border rounded-xl p-2 font-bold" />
@@ -596,6 +669,27 @@ export default function AdminApp() {
               </div>
               <input type="text" placeholder="নোট" value={newOffer.note} onChange={(e) => setNewOffer({ ...newOffer, note: e.target.value })} className="w-full bg-slate-50 border rounded-xl p-2 text-xs" />
               <button onClick={handleAddOffer} className="w-full py-2.5 bg-emerald-600 text-white font-bold rounded-xl shadow-md">অফার পাবলিশ করুন</button>
+            </div>
+
+            {/* বর্তমান অফার লিস্ট ও ডিলিট অপশন */}
+            <div className="bg-white border rounded-2xl p-3.5 space-y-2 shadow-sm">
+              <h4 className="font-bold text-slate-900 border-b pb-1.5">সকল বর্তমান অফার ({offers.length})</h4>
+              {offers.length === 0 ? (
+                <p className="text-slate-400 text-center py-2">কোনো অফার নেই</p>
+              ) : (
+                offers.map((of) => (
+                  <div key={of.id} className="bg-slate-50 border rounded-xl p-2.5 flex items-center justify-between">
+                    <div>
+                      <span className="text-[9px] font-bold bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded uppercase">{of.operator}</span>
+                      <h5 className="font-bold text-slate-900 text-xs mt-0.5">{of.title}</h5>
+                      <p className="text-[10px] text-emerald-600 font-bold">মূল্য: ৳{of.offerPrice} | কমিশন: ৳{of.cashback}</p>
+                    </div>
+                    <button onClick={() => handleDeleteOffer(of.id)} className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 active:scale-95" title="ডিলিট করুন">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}
