@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { db } from './firebase';
 import { ref, set, push, onValue, update, remove } from 'firebase/database';
-import { 
-  ShieldCheck, Wallet, Flame, MessageSquare, Search, Edit3, Trash2, 
-  ToggleLeft, ToggleRight, Send, ArrowLeft, History, Lock, LogOut, 
-  Radio, CheckCircle, XCircle, Copy, Check, Ban, Ticket, BellRing, Globe, FileText, Smartphone, Users, Sparkles
+import { 
+  ShieldCheck, Wallet, Flame, MessageSquare, Search, Edit3, Trash2, 
+  ToggleLeft, ToggleRight, Send, ArrowLeft, History, Lock, LogOut, 
+  Radio, CheckCircle, XCircle, Copy, Check, Ban, Ticket, BellRing, Globe, FileText, Smartphone, Users, Sparkles, Facebook, MessageCircle
 } from 'lucide-react';
 
 export default function AdminApp() {
@@ -13,7 +13,7 @@ export default function AdminApp() {
   const [adminPin, setAdminPin] = useState('');
   const [authError, setAuthError] = useState('');
 
-  const [activeSection, setActiveSection] = useState<'menu' | 'users' | 'add_money' | 'recharge_orders' | 'drive_orders' | 'offers' | 'history' | 'chats' | 'broadcast' | 'scratch_cards' | 'update_control'>('menu');
+  const [activeSection, setActiveSection] = useState<'menu' | 'users' | 'add_money' | 'recharge_orders' | 'drive_orders' | 'offers' | 'history' | 'chats' | 'broadcast' | 'scratch_cards' | 'update_control' | 'links'>('menu');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   const [customMainBalance, setCustomMainBalance] = useState('');
@@ -44,6 +44,9 @@ export default function AdminApp() {
   const [simStatus, setSimStatus] = useState<Record<string, boolean>>({
     Grameenphone: true, Robi: true, Banglalink: true, Airtel: true, Teletalk: true
   });
+
+  // সাপোর্ট লিংক
+  const [socialLinks, setSocialLinks] = useState({ facebookPage: '', whatsappNumber: '' });
 
   const [scratchCardsList, setScratchCardsList] = useState<any[]>([]);
   const [newCard, setNewCard] = useState({ type: 'Minute', title: '', price: '' });
@@ -119,6 +122,11 @@ export default function AdminApp() {
       }
     });
 
+    onValue(ref(db, 'settings/socialLinks'), (snapshot) => {
+      const val = snapshot.val();
+      if (val) setSocialLinks(val);
+    });
+
     onValue(ref(db, 'addMoneyLogs'), (snapshot) => {
       const data = snapshot.val();
       if (data) setAddMoneyLogs(Object.keys(data).map(key => ({ id: key, ...data[key] })));
@@ -161,6 +169,11 @@ export default function AdminApp() {
   const handleUpdateSettingsSave = () => {
     set(ref(db, 'settings/forceUpdate'), { enabled: forceUpdateEnabled, link: updateLink });
     setPopupAlert('✅ ফোর্স আপডেট সেটিংস সেভ হয়েছে!');
+  };
+
+  const handleUpdateSocialLinks = () => {
+    set(ref(db, 'settings/socialLinks'), socialLinks);
+    setPopupAlert('✅ সাপোর্ট ও সোশ্যাল লিংক সেভ হয়েছে!');
   };
 
   const updateAddMoneyNoteInDb = () => {
@@ -352,6 +365,7 @@ export default function AdminApp() {
       <main className="flex-1 p-3 max-w-lg mx-auto w-full overflow-y-auto space-y-4">
         {activeSection === 'menu' && (
           <div className="space-y-4">
+            {/* ড্যাশবোর্ড স্ট্যাটাস */}
             <div className="bg-gradient-to-tr from-[#1a1442] via-[#241b5c] to-[#120e2e] border border-white/10 rounded-3xl p-5 text-white shadow-2xl space-y-3 relative overflow-hidden">
               <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
               <div className="flex justify-between items-center relative z-10 border-b border-white/10 pb-2">
@@ -427,11 +441,41 @@ export default function AdminApp() {
                 <div className="w-10 h-10 rounded-2xl bg-teal-500/10 border border-teal-500/20 text-teal-400 flex items-center justify-center mb-2"><Smartphone className="w-5 h-5" /></div>
                 <span className="font-extrabold text-white text-xs">Force Update</span>
               </button>
+
+              <button onClick={() => setActiveSection('links')} className="col-span-2 bg-gradient-to-r from-cyan-600/20 to-blue-600/20 border border-cyan-500/30 hover:bg-cyan-600/30 rounded-3xl p-4 flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all">
+                <Globe className="w-5 h-5 text-cyan-400" />
+                <span className="font-extrabold text-cyan-300 text-xs">সাপোর্ট ও লিংক সেটিংস</span>
+              </button>
             </div>
           </div>
         )}
 
-        {/* রিচার্জ অর্ডার ভিউ */}
+        {/* সাপোর্ট ও সোশ্যাল লিংক সেটিংস */}
+        {activeSection === 'links' && (
+          <div className="space-y-4">
+            <div className="bg-[#141032] border border-white/10 rounded-3xl p-5 flex items-center justify-between shadow-xl">
+              <div>
+                <h4 className="font-bold text-white">সাপোর্ট ও সোশ্যাল লিংক</h4>
+                <p className="text-[10px] text-slate-400 mt-0.5">ইউজার অ্যাপের সাপোর্ট অপশনের জন্য লিংক সেট করুন</p>
+              </div>
+              <Globe className="w-8 h-8 text-cyan-400 opacity-80" />
+            </div>
+
+            <div className="bg-[#141032] border border-white/10 rounded-3xl p-5 space-y-4 shadow-xl">
+              <div>
+                <label className="text-[10px] font-bold text-indigo-300 block mb-1.5 flex items-center gap-1"><Facebook className="w-3.5 h-3.5" /> ফেসবুক পেজ লিংক</label>
+                <input type="text" value={socialLinks.facebookPage} onChange={(e) => setSocialLinks({ ...socialLinks, facebookPage: e.target.value })} placeholder="https://facebook.com/..." className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-medium text-white focus:outline-none focus:border-indigo-500" />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-emerald-300 block mb-1.5 flex items-center gap-1"><MessageCircle className="w-3.5 h-3.5" /> হোয়াটসঅ্যাপ নম্বর</label>
+                <input type="text" value={socialLinks.whatsappNumber} onChange={(e) => setSocialLinks({ ...socialLinks, whatsappNumber: e.target.value })} placeholder="+88017XXXXXXXX" className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs font-medium text-white focus:outline-none focus:border-emerald-500" />
+              </div>
+              <button onClick={handleUpdateSocialLinks} className="w-full py-3.5 bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-bold rounded-xl shadow-lg active:scale-95 transition-all">লিংকগুলো আপডেট করুন</button>
+            </div>
+          </div>
+        )}
+
+        {/* অন্যান্য সমস্ত ভিউ যা আগেই আপডেট করা হয়েছে (Recharge, Drive, Offers, Update, etc.) */}
         {activeSection === 'recharge_orders' && (
           <div className="space-y-3">
             <h4 className="font-bold text-slate-300 px-1 border-b border-white/10 pb-2">রিচার্জ অর্ডার রিকোয়েস্ট ({rechargeOrders.length})</h4>
@@ -498,7 +542,6 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* ক্যানসেল নোট মডাল */}
         {cancellingOrder && (
           <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="bg-[#18133a] border border-white/15 rounded-3xl p-5 max-w-xs w-full space-y-3 shadow-2xl text-white">
@@ -541,7 +584,10 @@ export default function AdminApp() {
             </div>
 
             <div className="bg-[#141032] border border-white/10 rounded-3xl p-5 space-y-3 shadow-xl">
-              <h4 className="font-bold text-white border-b border-white/10 pb-2 flex items-center gap-1.5"><Flame className="w-4 h-4 text-rose-500" /> নতুন ড্রাইভ অফার যোগ করুন</h4>
+              <h4 className="font-bold text-white border-b border-white/10 pb-2 flex items-center gap-1.5">
+                <Flame className="w-3.5 h-3.5 text-rose-500" /> নতুন ড্রাইভ অফার যোগ করুন
+              </h4>
+
               <div className="grid grid-cols-5 gap-1 bg-black/30 border border-white/10 p-1 rounded-xl">
                 {['Grameenphone', 'Robi', 'Banglalink', 'Airtel', 'Teletalk'].map((op) => (
                   <button key={op} type="button" onClick={() => setNewOffer({ ...newOffer, operator: op })} className={`py-2 rounded-lg font-bold text-[10px] ${newOffer.operator === op ? 'bg-indigo-600 text-white shadow' : 'text-slate-400'}`}>
@@ -549,6 +595,7 @@ export default function AdminApp() {
                   </button>
                 ))}
               </div>
+
               <input type="text" placeholder="টাইটেল (যেমন: 30 GB + 700 Min)" value={newOffer.title} onChange={(e) => setNewOffer({ ...newOffer, title: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500" />
               <div className="grid grid-cols-3 gap-2">
                 <input type="number" placeholder="মূল্য (৳)" value={newOffer.offerPrice} onChange={(e) => setNewOffer({ ...newOffer, offerPrice: e.target.value })} className="bg-black/40 border border-white/10 rounded-xl p-2.5 font-bold text-white text-center focus:outline-none focus:border-indigo-500" />
@@ -743,15 +790,15 @@ export default function AdminApp() {
               <input type="text" placeholder="নম্বর বা নাম দিয়ে খুঁজুন..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-[#141032] border border-white/20 rounded-2xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-indigo-500 shadow-lg" />
             </div>
             <div className="space-y-2.5">
-              {filteredUsers.map((u) => (
+              {usersList.filter(u => (u.phone || '').includes(searchQuery.trim()) || (u.name || '').toLowerCase().includes(searchQuery.toLowerCase().trim())).map((u) => (
                 <div key={u.id} onClick={() => handleOpenUser(u)} className="bg-[#141032] border border-white/10 rounded-2xl p-4 flex items-center justify-between shadow-lg cursor-pointer hover:bg-white/5 transition-all text-white">
                   <div>
                     <h4 className="font-bold text-sm">{u.name}</h4>
                     <p className="text-[10px] text-slate-400 font-mono mt-1">📱 {u.phone}</p>
                     <p className="text-[10px] text-indigo-300 font-mono mt-0.5">মেইন: ৳{u.mainBalance || 0} | ড্রাইভ: ৳{u.driveBalance || 0}</p>
                   </div>
-                  <button onClick={(e) => { e.stopPropagation(); toggleUserBan(u.id, u.isBanned); }} className={`p-2.5 rounded-xl border ${u.isBanned ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'}`}>
-                    {u.isBanned ? <Ban className="w-4 h-4" /> : <Users className="w-4 h-4" />}
+                  <button onClick={(e) => { e.stopPropagation(); update(ref(db, `users/${u.id}`), { isBanned: !u.isBanned }); }} className={`p-2.5 rounded-xl border ${u.isBanned ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'}`}>
+                    {u.isBanned ? <Ban className="w-4 h-4" /> : <UserIcon className="w-4 h-4" />}
                   </button>
                 </div>
               ))}
@@ -778,7 +825,10 @@ export default function AdminApp() {
                   <input type="number" value={customDriveBalance} onChange={(e) => setCustomDriveBalance(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 font-mono font-bold text-white focus:outline-none focus:border-indigo-500" />
                 </div>
               </div>
-              <button onClick={handleSaveBalance} className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-xl shadow-lg active:scale-95">ব্যালেন্স আপডেট করুন</button>
+              <button onClick={() => {
+                update(ref(db, `users/${selectedUser.id}`), { mainBalance: Number(customMainBalance) || 0, driveBalance: Number(customDriveBalance) || 0 });
+                setPopupAlert('✅ ব্যালেন্স আপডেট সফল!');
+              }} className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-xl shadow-lg active:scale-95">ব্যালেন্স আপডেট করুন</button>
             </div>
           </div>
         )}
@@ -883,12 +933,12 @@ export default function AdminApp() {
       {/* পপআপ অ্যালার্ট */}
       {popupAlert && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#18133a] border border-white/15 rounded-3xl p-5 max-w-xs w-full text-center space-y-4 shadow-2xl text-white">
-            <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto border border-emerald-500/30 shadow-inner">
-              <Check className="w-6 h-6 stroke-[3]" />
+          <div className="bg-[#18133a] border border-white/15 rounded-3xl p-6 max-w-xs w-full text-center space-y-4 shadow-2xl text-white">
+            <div className="w-14 h-14 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto border border-emerald-500/30 shadow-inner">
+              <Check className="w-7 h-7 stroke-[3]" />
             </div>
-            <h4 className="text-xs font-black leading-relaxed">{popupAlert}</h4>
-            <button onClick={() => setPopupAlert(null)} className="w-full py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-xl shadow-lg active:scale-95">ঠিক আছে</button>
+            <h4 className="text-xs font-black leading-relaxed text-slate-200">{popupAlert}</h4>
+            <button onClick={() => setPopupAlert(null)} className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-xl shadow-lg active:scale-95">ঠিক আছে</button>
           </div>
         </div>
       )}
