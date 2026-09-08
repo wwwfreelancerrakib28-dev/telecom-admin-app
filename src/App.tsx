@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
+import { db } from './firebase';
+import { ref, set, push, onValue, update, remove } from 'firebase/database';
 import { 
   ShieldCheck, 
   Users, 
@@ -62,21 +64,119 @@ export default function AdminApp() {
   const [noticeInput, setNoticeInput] = useState(runningNotice);
   const [soundAlertEnabled, setSoundAlertEnabled] = useState(true);
 
-  // ব্রডকাস্ট ও পার্সোনাল নোটিফিকেশন স্টেট (বিল্ড এরর ফিক্সড)
+  // ব্রডকাস্ট ও পার্সোনাল নোটিফিকেশন স্টেট
   const [broadcastType, setBroadcastType] = useState<'all' | 'personal'>('all');
   const [targetPhone, setTargetPhone] = useState('');
   const [broadcastMsg, setBroadcastMsg] = useState('');
 
-  const [scratchCardsList, setScratchCardsList] = useState([
-    { id: 'SC-1', type: 'Minute', title: '50 মিনিট প্যাক', price: 30, pin: '*123*88493021#' }
-  ]);
+  const [scratchCardsList, setScratchCardsList] = useState<any[]>([]);
   const [newCard, setNewCard] = useState({ type: 'Minute', title: '', price: '', pin: '' });
   const [popupAlert, setPopupAlert] = useState<string | null>(null);
+
+  const [usersList, setUsersList] = useState<any[]>([]);
+  const [addMoneyEnabled, setAddMoneyEnabled] = useState(true);
+  const [paymentNumbers, setPaymentNumbers] = useState({ bkash: '01728116153', nagad: '01728116153', rocket: '01728116153' });
+
+  const [offers, setOffers] = useState<any[]>([]);
+  const [newOffer, setNewOffer] = useState({ operator: 'Grameenphone', title: '', offerPrice: '', cashback: '', profit: '', note: '' });
+
+  const [addMoneyLogs, setAddMoneyLogs] = useState<any[]>([]);
+  const [rechargeOrders, setRechargeOrders] = useState<any[]>([]);
+  const [driveOrders, setDriveOrders] = useState<any[]>([]);
+
+  const [chatUsers, setChatUsers] = useState<any[]>([]);
+  const [activeChatUser, setActiveChatUser] = useState<any>(null);
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [replyText, setReplyText] = useState('');
+
+  // Firebase Data Synchronization
+  useEffect(() => {
+    // Users Sync
+    onValue(ref(db, 'users'), (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const list = Object.keys(data).map(key => ({ id: key, ...data[key] }));
+        setUsersList(list);
+        setChatUsers(list);
+        if (!activeChatUser && list.length > 0) setActiveChatUser(list[0]);
+      } else {
+        setUsersList([]);
+      }
+    });
+
+    // Offers Sync
+    onValue(ref(db, 'offers'), (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const list = Object.keys(data).map(key => ({ id: key, ...data[key] }));
+        setOffers(list);
+      } else {
+        setOffers([]);
+      }
+    });
+
+    // Notice Sync
+    onValue(ref(db, 'settings/notice'), (snapshot) => {
+      const val = snapshot.val();
+      if (val) {
+        setRunningNotice(val);
+        setNoticeInput(val);
+      }
+    });
+
+    // Add Money Settings & Logs Sync
+    onValue(ref(db, 'settings/addMoney'), (snapshot) => {
+      const val = snapshot.val();
+      if (val) {
+        if (val.enabled !== undefined) setAddMoneyEnabled(val.enabled);
+        if (val.numbers) setPaymentNumbers(val.numbers);
+      }
+    });
+
+    onValue(ref(db, 'addMoneyLogs'), (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setAddMoneyLogs(Object.keys(data).map(key => ({ id: key, ...data[key] })));
+      } else {
+        setAddMoneyLogs([]);
+      }
+    });
+
+    // Recharge Orders Sync
+    onValue(ref(db, 'rechargeOrders'), (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setRechargeOrders(Object.keys(data).map(key => ({ id: key, ...data[key] })));
+      } else {
+        setRechargeOrders([]);
+      }
+    });
+
+    // Drive Orders Sync
+    onValue(ref(db, 'driveOrders'), (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setDriveOrders(Object.keys(data).map(key => ({ id: key, ...data[key] })));
+      } else {
+        setDriveOrders([]);
+      }
+    });
+
+    // Scratch Cards Sync
+    onValue(ref(db, 'scratchCards'), (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setScratchCardsList(Object.keys(data).map(key => ({ id: key, ...data[key] })));
+      } else {
+        setScratchCardsList([]);
+      }
+    });
+  }, []);
 
   const handleCopyCardPin = (pin: string, id: string) => {
     navigator.clipboard.writeText(pin);
     setCopiedId(id);
-    setPopupAlert('🎉 সফলভাবে কপি হয়েছে!');
+    setPopupAlert('🎉 সফলভাবে কপি হয়েছে!');
     setTimeout(() => {
       setCopiedId(null);
       setPopupAlert(null);
@@ -84,40 +184,16 @@ export default function AdminApp() {
   };
 
   const appStats = {
-    totalInstalls: 342,
-    activeAccounts: 128,
-    totalBalance: 18500,
-    onlineNowList: [
-      { id: '1', name: 'User', phone: '01728116153', device: 'Android 14', activeTime: 'Now' }
-    ]
+    totalInstalls: usersList.length + 300,
+    activeAccounts: usersList.length,
+    totalBalance: usersList.reduce((acc, u) => acc + (Number(u.mainBalance) || 0) + (Number(u.driveBalance) || 0), 18500),
+    onlineNowList: usersList.map(u => ({ id: u.id, name: u.name, phone: u.phone, device: 'Android', activeTime: 'Now' }))
   };
 
   const onlineCount = appStats.onlineNowList.length;
 
-  const [addMoneyLogs, setAddMoneyLogs] = useState([
-    { id: 'AM-101', userName: 'User', userPhone: '01728116153', method: 'bKash', amount: 1000, balanceType: 'main', trxId: 'BK990011', time: '10:30 AM', status: 'Approved' }
-  ]);
-
-  const [rechargeOrders, setRechargeOrders] = useState([
-    { id: 'RCH-101', userId: '1', userName: 'User', userPhone: '01728116153', userMainBal: 1400, userDriveBal: 3870, operator: 'Grameenphone', amount: 200, targetNumber: '01711223344', time: '10:45 AM', status: 'Pending', note: '' }
-  ]);
-
-  const [driveOrders, setDriveOrders] = useState([
-    { id: 'DRV-201', userId: '1', userName: 'User', userPhone: '01728116153', userMainBal: 1400, userDriveBal: 3870, operator: 'Grameenphone', packageTitle: '30 GB + 700 Min', price: 580, targetNumber: '01711223344', time: '12:00 PM', status: 'Pending', hasLoan: false, note: '' }
-  ]);
-
   const pendingRechargeCount = rechargeOrders.filter(o => o.status === 'Pending').length;
   const pendingDriveCount = driveOrders.filter(o => o.status === 'Pending').length;
-
-  // লাইভ চ্যাট ইউজার লিস্ট
-  const [chatUsers] = useState([
-    { id: '1', name: 'User', phone: '01728116153', mainBalance: 1400, driveBalance: 3870, avatarBg: 'bg-indigo-600', lastMsg: 'ভাই রিচার্জ আটকে আছে' }
-  ]);
-  const [activeChatUser] = useState<any>(chatUsers[0]);
-  const [chatMessages, setChatMessages] = useState([
-    { sender: 'user', text: 'ভাই রিচার্জ আটকে আছে' }
-  ]);
-  const [replyText, setReplyText] = useState('');
 
   const handleBack = () => {
     if (cancellingOrder) {
@@ -147,27 +223,6 @@ export default function AdminApp() {
     };
   }, [cancellingOrder, editingOffer, editingUser, selectedUser, activeSection]);
 
-  const [operatorStatus, setOperatorStatus] = useState<Record<string, boolean>>({
-    Grameenphone: true, Robi: true, Banglalink: true, Airtel: true, Teletalk: false
-  });
-  const [driveServiceEnabled, setDriveServiceEnabled] = useState(true);
-  const [rechargeOperatorStatus, setRechargeOperatorStatus] = useState<Record<string, boolean>>({
-    Grameenphone: true, Robi: true, Banglalink: true, Airtel: true, Teletalk: true
-  });
-
-  const [usersList, setUsersList] = useState([
-    { id: '1', name: 'User', phone: '01728116153', pin: '1234', mainBalance: 1400, driveBalance: 3870, isBanned: false },
-    { id: '2', name: 'Rakib Telecom', phone: '01844556677', pin: '5566', mainBalance: 500, driveBalance: 1200, isBanned: false }
-  ]);
-
-  const [addMoneyEnabled, setAddMoneyEnabled] = useState(true);
-  const [paymentNumbers, setPaymentNumbers] = useState({ bkash: '01728116153', nagad: '01728116153', rocket: '01728116153' });
-
-  const [offers, setOffers] = useState([
-    { id: '1', operator: 'Grameenphone', title: '30 GB + 700 Min (30 Days)', offerPrice: 580, cashback: 119, profit: 45, note: 'ঢাকা ও চট্টগ্রাম' }
-  ]);
-  const [newOffer, setNewOffer] = useState({ operator: 'Grameenphone', title: '', offerPrice: '', cashback: '', profit: '', note: '' });
-
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (adminPin === '1234' || adminPin.length >= 4) {
@@ -180,72 +235,86 @@ export default function AdminApp() {
 
   const handleOpenUser = (u: any) => {
     setSelectedUser(u);
-    setCustomMainBalance(u.mainBalance.toString());
-    setCustomDriveBalance(u.driveBalance.toString());
+    setCustomMainBalance((u.mainBalance || 0).toString());
+    setCustomDriveBalance((u.driveBalance || 0).toString());
   };
 
   const handleSaveBalance = () => {
     if (!selectedUser) return;
     const main = customMainBalance === '' ? 0 : Number(customMainBalance);
     const drive = customDriveBalance === '' ? 0 : Number(customDriveBalance);
-    setUsersList(prev => prev.map(u => u.id === selectedUser.id ? { ...u, mainBalance: main, driveBalance: drive } : u));
+    update(ref(db, `users/${selectedUser.id}`), { mainBalance: main, driveBalance: drive });
     setSelectedUser({ ...selectedUser, mainBalance: main, driveBalance: drive });
     alert('ব্যালেন্স আপডেট সফল!');
   };
 
-  const toggleUserBan = (userId: string) => {
-    setUsersList(prev => prev.map(u => u.id === userId ? { ...u, isBanned: !u.isBanned } : u));
+  const toggleUserBan = (userId: string, currentStatus: boolean) => {
+    update(ref(db, `users/${userId}`), { isBanned: !currentStatus });
   };
 
-  const toggleDriveLoanStatus = (id: string) => {
-    setDriveOrders(prev => prev.map(o => o.id === id ? { ...o, hasLoan: !o.hasLoan } : o));
+  const toggleDriveLoanStatus = (id: string, currentStatus: boolean) => {
+    update(ref(db, `driveOrders/${id}`), { hasLoan: !currentStatus });
   };
 
   const handleCompleteDrive = (ord: any) => {
     if (ord.hasLoan) {
-      alert('⚠️ এই নম্বরে লোন আছে! লোন থাকা অবস্থায় ড্রাইভ কমপ্লিট করা যাবে না।');
+      alert('⚠️ এই নম্বরে লোন আছে! লোন থাকা অবস্থায় ড্রাইভ কমপ্লিট করা যাবে না।');
       return;
     }
-    completeDriveOrder(ord.id);
+    update(ref(db, `driveOrders/${ord.id}`), { status: 'Completed' });
   };
 
   const handleAddOffer = () => {
     if (!newOffer.title || !newOffer.offerPrice) return alert('তথ্য দিন');
-    setOffers(prev => [...prev, { id: Date.now().toString(), ...newOffer, offerPrice: Number(newOffer.offerPrice), cashback: Number(newOffer.cashback) || 0, profit: Number(newOffer.profit) || 0 }]);
+    const newRef = push(ref(db, 'offers'));
+    set(newRef, {
+      ...newOffer,
+      offerPrice: Number(newOffer.offerPrice),
+      cashback: Number(newOffer.cashback) || 0,
+      profit: Number(newOffer.profit) || 0
+    });
     setNewOffer({ operator: 'Grameenphone', title: '', offerPrice: '', cashback: '', profit: '', note: '' });
-    alert('পাবলিশ হয়েছে!');
-  };
-
-  const handleSaveEditedOffer = () => {
-    if (!editingOffer) return;
-    setOffers(prev => prev.map(o => o.id === editingOffer.id ? editingOffer : o));
-    setEditingOffer(null);
-    alert('মডিফাই সফল হয়েছে!');
+    alert('পাবলিশ হয়েছে!');
   };
 
   const handleAddNewCard = () => {
     if (!newCard.title || !newCard.price || !newCard.pin) return alert('সব পূরণ করুন');
-    setScratchCardsList(prev => [...prev, { id: 'SC-' + Date.now(), ...newCard, price: Number(newCard.price) }]);
+    const newRef = push(ref(db, 'scratchCards'));
+    set(newRef, {
+      ...newCard,
+      price: Number(newCard.price)
+    });
     setNewCard({ type: 'Minute', title: '', price: '', pin: '' });
-    alert('কার্ড তৈরি হয়েছে!');
+    alert('কার্ড তৈরি হয়েছে!');
   };
 
-  const completeRechargeOrder = (id: string) => setRechargeOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'Completed' } : o));
-  const completeDriveOrder = (id: string) => setDriveOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'Completed' } : o));
+  const completeRechargeOrder = (id: string) => {
+    update(ref(db, `rechargeOrders/${id}`), { status: 'Completed' });
+  };
 
   const submitCancelOrder = (type: 'recharge' | 'drive') => {
     if (!cancellingOrder) return;
-    if (type === 'recharge') {
-      setRechargeOrders(prev => prev.map(o => o.id === cancellingOrder.id ? { ...o, status: 'Cancelled', note: cancelNote.trim() } : o));
-    } else {
-      setDriveOrders(prev => prev.map(o => o.id === cancellingOrder.id ? { ...o, status: 'Cancelled', note: cancelNote.trim() } : o));
-    }
+    const path = type === 'recharge' ? `rechargeOrders/${cancellingOrder.id}` : `driveOrders/${cancellingOrder.id}`;
+    update(ref(db, path), { status: 'Cancelled', note: cancelNote.trim() });
     setCancellingOrder(null);
     setCancelNote('');
   };
 
-  const filteredUsers = usersList.filter(u => u.phone.includes(searchQuery.trim()) || u.name.toLowerCase().includes(searchQuery.toLowerCase().trim()));
-  const visibleOffers = offers.filter(of => of.operator === selectedOperatorFilter);
+  const updateNoticeInDb = () => {
+    set(ref(db, 'settings/notice'), noticeInput);
+    setRunningNotice(noticeInput);
+    alert('রানিং নোটিশ আপডেট হয়েছে!');
+  };
+
+  const updateAddMoneySettings = () => {
+    set(ref(db, 'settings/addMoney'), {
+      enabled: addMoneyEnabled,
+      numbers: paymentNumbers
+    });
+    alert('পেমেন্ট সেটিংস সফলভাবে আপডেট করা হয়েছে!');
+  };
+
+  const filteredUsers = usersList.filter(u => (u.phone || '').includes(searchQuery.trim()) || (u.name || '').toLowerCase().includes(searchQuery.toLowerCase().trim()));
 
   if (!isAuthenticated) {
     return (
@@ -340,7 +409,7 @@ export default function AdminApp() {
                 )}
                 <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mb-1.5"><Flame className="w-4 h-4" /></div>
                 <span className="font-bold text-slate-900">ড্রাইভ অর্ডার</span>
-                <span className="text-[9px] text-slate-400">প্যাকেজ রিকোয়েস্ট</span>
+                <span className="text-[9px] text-slate-400">প্যাকেজ রিকোয়েস্ট</span>
               </button>
 
               <button onClick={() => setActiveSection('scratch_cards')} className="bg-white border rounded-2xl p-3 flex flex-col items-center text-center shadow-sm active:scale-95">
@@ -382,78 +451,13 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* উন্নত রানিং ও পার্সোনাল নোটিশ ব্রডকাস্ট পেজ */}
+        {/* নোটিশ ব্রডকাস্ট পেজ */}
         {activeSection === 'broadcast' && (
           <div className="space-y-3">
             <div className="bg-white border rounded-2xl p-3.5 space-y-2.5 shadow-sm">
               <h4 className="font-bold text-slate-900 border-b pb-1.5">রানিং নোটিশ আপডেট (App Marquee)</h4>
               <input type="text" value={noticeInput} onChange={(e) => setNoticeInput(e.target.value)} className="w-full bg-slate-50 border rounded-xl p-2.5 font-medium" />
-              <button onClick={() => { setRunningNotice(noticeInput); alert('রানিং নোটিশ আপডেট হয়েছে!'); }} className="w-full py-2.5 bg-indigo-600 text-white font-bold rounded-xl">আপডেট করুন</button>
-            </div>
-
-            <div className="bg-white border rounded-2xl p-3.5 space-y-3 shadow-sm">
-              <h4 className="font-bold text-slate-900 border-b pb-1.5 flex items-center gap-1.5">
-                <BellRing className="w-4 h-4 text-indigo-600" /> নোটিফিকেশন ও মেসেজ সেন্ডার
-              </h4>
-
-              <div className="grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded-xl">
-                <button 
-                  onClick={() => setBroadcastType('all')} 
-                  className={`py-2 rounded-lg font-bold transition-all ${broadcastType === 'all' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600'}`}
-                >
-                  🌐 সবাইকে পাঠান
-                </button>
-                <button 
-                  onClick={() => setBroadcastType('personal')} 
-                  className={`py-2 rounded-lg font-bold transition-all ${broadcastType === 'personal' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600'}`}
-                >
-                  👤 পার্সোনাল (নির্দিষ্ট কাউকে)
-                </button>
-              </div>
-
-              {broadcastType === 'personal' && (
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 block mb-1">গ্রাহকের মোবাইল নম্বর বা সিলেক্ট করুন</label>
-                  <select 
-                    value={targetPhone} 
-                    onChange={(e) => setTargetPhone(e.target.value)} 
-                    className="w-full bg-slate-50 border rounded-xl p-2.5 font-bold text-xs"
-                  >
-                    <option value="">-- গ্রাহক সিলেক্ট করুন --</option>
-                    {usersList.map(u => (
-                      <option key={u.id} value={u.phone}>{u.name} ({u.phone})</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 block mb-1">নোটিফিকেশন মেসেজ লিখুন</label>
-                <textarea 
-                  placeholder={broadcastType === 'all' ? "সকল ইউজারের জন্য নোটিশ লিখুন..." : "নির্দিষ্ট গ্রাহকের জন্য পার্সোনাল মেসেজ লিখুন..."} 
-                  value={broadcastMsg} 
-                  onChange={(e) => setBroadcastMsg(e.target.value)} 
-                  className="w-full bg-slate-50 border rounded-xl p-2.5 h-24 focus:outline-none focus:border-indigo-600" 
-                />
-              </div>
-
-              <button 
-                onClick={() => {
-                  if (!broadcastMsg.trim()) return alert('মেসেজের লেখা লিখুন!');
-                  if (broadcastType === 'personal' && !targetPhone) return alert('দয়া করে নির্দিষ্ট গ্রাহক বা নম্বর সিলেক্ট করুন!');
-                  
-                  if (broadcastType === 'all') {
-                    alert('সফলভাবে সকল ইউজারের কাছে নোটিফিকেশন পাঠানো হয়েছে!');
-                  } else {
-                    alert(`সফলভাবে ${targetPhone} নম্বরে পার্সোনাল নোটিফিকেশন পাঠানো হয়েছে!`);
-                  }
-                  setBroadcastMsg('');
-                  setTargetPhone('');
-                }} 
-                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md flex items-center justify-center gap-1.5"
-              >
-                <Send className="w-4 h-4" /> নোটিফিকেশন সেন্ড করুন
-              </button>
+              <button onClick={updateNoticeInDb} className="w-full py-2.5 bg-indigo-600 text-white font-bold rounded-xl">আপডেট করুন</button>
             </div>
           </div>
         )}
@@ -499,28 +503,24 @@ export default function AdminApp() {
         {/* রিচার্জ অর্ডার */}
         {activeSection === 'recharge_orders' && (
           <div className="space-y-3">
-            <h4 className="font-bold text-slate-800 px-1">ফ্লেক্সিলোড / রিচার্জ অর্ডার রিকোয়েস্ট ({rechargeOrders.length})</h4>
+            <h4 className="font-bold text-slate-800 px-1">ফ্লেক্সিলোড / রিচার্জ অর্ডার রিকোয়েস্ট ({rechargeOrders.length})</h4>
             {rechargeOrders.map((ord) => (
               <div key={ord.id} className="bg-white border rounded-2xl p-3.5 space-y-2.5 shadow-sm">
                 <div className="flex justify-between items-center border-b pb-2">
                   <span className="font-black text-slate-900 text-xs bg-sky-50 text-sky-700 px-2 py-0.5 rounded border border-sky-200">{ord.operator} - ৳{ord.amount}</span>
                   <span className={`text-[9px] font-bold px-2 py-0.5 rounded-lg ${ord.status === 'Completed' ? 'bg-emerald-50 text-emerald-700' : ord.status === 'Cancelled' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700'}`}>{ord.status}</span>
                 </div>
-
                 <div className="bg-slate-50 border rounded-xl p-2.5 space-y-1.5 text-[11px]">
                   <p className="text-slate-700">👤 ইউজারের নাম: <strong className="text-slate-900">{ord.userName}</strong></p>
                   <p className="text-slate-700">📱 অ্যাকাউন্ট নম্বর: <strong className="font-mono text-slate-900">{ord.userPhone}</strong></p>
-                  <p className="text-slate-700">💰 ব্যালেন্স: <span className="font-mono text-amber-600 font-bold">মেইন: ৳{ord.userMainBal}</span> | <span className="font-mono text-indigo-600 font-bold">ড্রাইভ: ৳{ord.userDriveBal}</span></p>
-                  
                   <div className="flex items-center justify-between pt-1.5 border-t border-slate-200">
                     <span className="text-slate-700">🎯 প্রেরণের নম্বর: <strong className="font-mono text-indigo-700 text-xs">{ord.targetNumber}</strong></span>
                     <button onClick={() => handleCopyCardPin(ord.targetNumber, ord.id)} className="px-2.5 py-1 bg-indigo-600 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 active:scale-95">
                       {copiedId === ord.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                      <span>{copiedId === ord.id ? 'কপি হয়েছে!' : 'নম্বর কপি'}</span>
+                      <span>{copiedId === ord.id ? 'কপি হয়েছে!' : 'নম্বর কপি'}</span>
                     </button>
                   </div>
                 </div>
-
                 {ord.status === 'Pending' && (
                   <div className="flex gap-2 pt-1">
                     <button onClick={() => completeRechargeOrder(ord.id)} className="flex-1 py-2 bg-emerald-600 text-white font-bold rounded-xl flex items-center justify-center gap-1">
@@ -539,38 +539,33 @@ export default function AdminApp() {
         {/* ড্রাইভ অর্ডার */}
         {activeSection === 'drive_orders' && (
           <div className="space-y-3">
-            <h4 className="font-bold text-slate-800 px-1">ড্রাইভ প্যাক অর্ডার রিকোয়েস্ট ({driveOrders.length})</h4>
+            <h4 className="font-bold text-slate-800 px-1">ড্রাইভ প্যাক অর্ডার রিকোয়েস্ট ({driveOrders.length})</h4>
             {driveOrders.map((ord) => (
               <div key={ord.id} className="bg-white border rounded-2xl p-3.5 space-y-2.5 shadow-sm">
                 <div className="flex justify-between items-center border-b pb-2">
                   <span className="font-black text-slate-900 text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-200">{ord.operator} - {ord.packageTitle} (৳{ord.price})</span>
                   <span className={`text-[9px] font-bold px-2 py-0.5 rounded-lg ${ord.status === 'Completed' ? 'bg-emerald-50 text-emerald-700' : ord.status === 'Cancelled' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700'}`}>{ord.status}</span>
                 </div>
-
                 <div className="bg-slate-50 border rounded-xl p-2.5 space-y-1.5 text-[11px]">
                   <p className="text-slate-700">👤 ইউজারের নাম: <strong className="text-slate-900">{ord.userName}</strong></p>
                   <p className="text-slate-700">📱 অ্যাকাউন্ট নম্বর: <strong className="font-mono text-slate-900">{ord.userPhone}</strong></p>
-                  <p className="text-slate-700">💰 ব্যালেন্স: <span className="font-mono text-amber-600 font-bold">মেইন: ৳{ord.userMainBal}</span> | <span className="font-mono text-indigo-600 font-bold">ড্রাইভ: ৳{ord.userDriveBal}</span></p>
-                  
                   <div className="flex items-center justify-between pt-1 border-t border-slate-200">
                     <span className="text-slate-700">🎯 প্রেরণের নম্বর: <strong className="font-mono text-indigo-700 text-xs">{ord.targetNumber}</strong></span>
                     <button onClick={() => handleCopyCardPin(ord.targetNumber, ord.id)} className="px-2.5 py-1 bg-indigo-600 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 active:scale-95">
                       {copiedId === ord.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                      <span>{copiedId === ord.id ? 'কপি হয়েছে!' : 'নম্বর কপি'}</span>
+                      <span>{copiedId === ord.id ? 'কপি হয়েছে!' : 'নম্বর কপি'}</span>
                     </button>
                   </div>
-
                   <div className="flex items-center justify-between pt-2 border-t border-slate-200 bg-amber-50/60 p-2 rounded-lg">
                     <span className="font-bold text-slate-800">⚠️ এই নাম্বারে কি লোন আছে?</span>
                     <button 
-                      onClick={() => toggleDriveLoanStatus(ord.id)}
+                      onClick={() => toggleDriveLoanStatus(ord.id, ord.hasLoan)}
                       className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${ord.hasLoan ? 'bg-rose-600 text-white shadow-sm' : 'bg-emerald-600 text-white shadow-sm'}`}
                     >
                       {ord.hasLoan ? 'হ্যাঁ (Loan আছে)' : 'না (Loan নাই)'}
                     </button>
                   </div>
                 </div>
-
                 {ord.status === 'Pending' && (
                   <div className="flex gap-2 pt-1">
                     <button onClick={() => handleCompleteDrive(ord)} className="flex-1 py-2 bg-emerald-600 text-white font-bold rounded-xl flex items-center justify-center gap-1">
@@ -686,7 +681,7 @@ export default function AdminApp() {
                 <label className="text-[10px] font-bold text-purple-600 block mb-0.5">Rocket নম্বর</label>
                 <input type="tel" value={paymentNumbers.rocket} onChange={(e) => setPaymentNumbers({ ...paymentNumbers, rocket: e.target.value })} className="w-full bg-slate-50 border rounded-xl p-2 text-xs font-mono font-bold" />
               </div>
-              <button onClick={() => alert('নম্বর সফলভাবে আপডেট করা হয়েছে!')} className="w-full py-2.5 bg-indigo-600 text-white font-bold rounded-xl shadow-md">
+              <button onClick={updateAddMoneySettings} className="w-full py-2.5 bg-indigo-600 text-white font-bold rounded-xl shadow-md">
                 নম্বরগুলো সেভ করুন
               </button>
             </div>
@@ -738,9 +733,9 @@ export default function AdminApp() {
               <div key={u.id} onClick={() => handleOpenUser(u)} className="bg-white border rounded-xl p-3 flex items-center justify-between shadow-sm cursor-pointer">
                 <div>
                   <h4 className="font-bold text-slate-900">{u.name}</h4>
-                  <p className="text-[10px] text-slate-500 font-mono">{u.phone} | মেইন: ৳{u.mainBalance} | ড্রাইভ: ৳{u.driveBalance}</p>
+                  <p className="text-[10px] text-slate-500 font-mono">{u.phone} | মেইন: ৳{u.mainBalance || 0} | ড্রাইভ: ৳{u.driveBalance || 0}</p>
                 </div>
-                <button onClick={(e) => { e.stopPropagation(); toggleUserBan(u.id); }} className={`p-1.5 rounded-lg ${u.isBanned ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                <button onClick={(e) => { e.stopPropagation(); toggleUserBan(u.id, u.isBanned); }} className={`p-1.5 rounded-lg ${u.isBanned ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
                   {u.isBanned ? <UserCheck className="w-3.5 h-3.5" /> : <Ban className="w-3.5 h-3.5" />}
                 </button>
               </div>
@@ -766,13 +761,13 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* লাইভ চ্যাট (যেখানে ইউজারের প্রোফাইল নাম, ছবি ও ব্যালেন্স ওপরের দিকে ছোট করে শো করবে) */}
-        {activeSection === 'chats' && (
+        {/* লাইভ চ্যাট */}
+        {activeSection === 'chats' && activeChatUser && (
           <div className="bg-white border rounded-2xl p-3 h-[420px] flex flex-col shadow-sm">
             <div className="border-b pb-2 mb-2 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className={`w-9 h-9 rounded-full ${activeChatUser.avatarBg} text-white flex items-center justify-center font-bold text-sm shadow-sm`}>
-                  {activeChatUser.name.charAt(0)}
+                <div className="w-9 h-9 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-sm">
+                  {(activeChatUser.name || 'U').charAt(0)}
                 </div>
                 <div>
                   <h4 className="font-bold text-slate-900 text-xs leading-tight">{activeChatUser.name}</h4>
@@ -781,7 +776,7 @@ export default function AdminApp() {
               </div>
               <div className="bg-slate-100 border border-slate-200/80 px-2.5 py-1 rounded-xl text-right">
                 <p className="text-[9px] text-slate-400 font-semibold uppercase">ব্যালেন্স</p>
-                <p className="text-[10px] font-bold font-mono text-indigo-600">মেইন: ৳{activeChatUser.mainBalance} | ড্রাইভ: ৳{activeChatUser.driveBalance}</p>
+                <p className="text-[10px] font-bold font-mono text-indigo-600">মেইন: ৳{activeChatUser.mainBalance || 0} | ড্রাইভ: ৳{activeChatUser.driveBalance || 0}</p>
               </div>
             </div>
 
