@@ -1,0 +1,6 @@
+{
+  "appId": "com.simoffershop.admin",
+  "appName": "SIM OFFER SHOP ADMIN PANEL",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}
