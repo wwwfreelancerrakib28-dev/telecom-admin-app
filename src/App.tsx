@@ -90,17 +90,19 @@ export default function AdminApp() {
 
   const onlineCount = appStats.onlineNowList.length;
 
+  // পূর্ণাঙ্গ এড-মানি হিস্ট্রি লগ
   const [addMoneyLogs, setAddMoneyLogs] = useState([
-    { id: 'AM-101', userName: 'User', userPhone: '01728116153', method: 'bKash', amount: 1000, balanceType: 'main', trxId: 'BK990011', time: '10:30 AM', status: 'Approved' }
+    { id: 'AM-101', userName: 'User', userPhone: '01728116153', method: 'bKash', amount: 1000, balanceType: 'main', trxId: 'BK990011', time: '10:30 AM', status: 'Approved' },
+    { id: 'AM-102', userName: 'Rakib Telecom', userPhone: '01844556677', method: 'Nagad', amount: 500, balanceType: 'drive', trxId: 'NG554433', time: '11:15 AM', status: 'Approved' }
   ]);
 
   const [rechargeOrders, setRechargeOrders] = useState([
-    { id: 'RCH-101', userId: '1', userName: 'User', userPhone: '01728116153', userMainBal: 1400, userDriveBal: 3870, operator: 'Grameenphone', amount: 200, targetNumber: '01711223344', time: '10:45 AM', status: 'Pending', note: '' }
+    { id: 'RCH-101', userId: '1', userName: 'User', userPhone: '01728116153', userMainBal: 1400, userDriveBal: 3870, operator: 'Grameenphone', amount: 200, targetNumber: '01711223344', time: '10:45 AM', status: 'Completed', note: '' },
+    { id: 'RCH-102', userId: '2', userName: 'Rakib Telecom', userPhone: '01844556677', userMainBal: 500, userDriveBal: 1200, operator: 'Robi', amount: 300, targetNumber: '01811223344', time: '11:00 AM', status: 'Pending', note: '' }
   ]);
 
-  // ড্রাইভ অর্ডারে সিম লোন স্ট্যাটাস (hasLoan: true/false) যোগ করা হয়েছে
   const [driveOrders, setDriveOrders] = useState([
-    { id: 'DRV-201', userId: '1', userName: 'User', userPhone: '01728116153', userMainBal: 1400, userDriveBal: 3870, operator: 'Grameenphone', packageTitle: '30 GB + 700 Min', price: 580, targetNumber: '01711223344', time: '12:00 PM', status: 'Pending', hasLoan: false, note: '' }
+    { id: 'DRV-201', userId: '1', userName: 'User', userPhone: '01728116153', userMainBal: 1400, userDriveBal: 3870, operator: 'Grameenphone', packageTitle: '30 GB + 700 Min', price: 580, targetNumber: '01711223344', time: '12:00 PM', status: 'Completed', hasLoan: false, note: '' }
   ]);
 
   const pendingRechargeCount = rechargeOrders.filter(o => o.status === 'Pending').length;
@@ -184,15 +186,13 @@ export default function AdminApp() {
     setUsersList(prev => prev.map(u => u.id === userId ? { ...u, isBanned: !u.isBanned } : u));
   };
 
-  // ড্রাইভ অর্ডারে লোন টগল করার ফাংশন (হ্যাঁ/না)
   const toggleDriveLoanStatus = (id: string) => {
     setDriveOrders(prev => prev.map(o => o.id === id ? { ...o, hasLoan: !o.hasLoan } : o));
   };
 
-  // ড্রাইভ কমপ্লিট করার সময় লোন চেক করা
   const handleCompleteDrive = (ord: any) => {
     if (ord.hasLoan) {
-      alert('⚠️ এই নম্বরে লোন আছে! লোন থাকা অবস্থায় ড্রাইভ কমপ্লিট করা যাবে না। প্রথমে লোন পরিশোধ করতে বলুন।');
+      alert('⚠️ এই নম্বরে লোন আছে! লোন থাকা অবস্থায় ড্রাইভ কমপ্লিট করা যাবে না।');
       return;
     }
     completeDriveOrder(ord.id);
@@ -411,7 +411,7 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* ড্রাইভ অর্ডার (যেখানে সিম লোন চেক বক্স ও হ্যাঁ/না অপশন যুক্ত করা হয়েছে) */}
+        {/* ড্রাইভ অর্ডার */}
         {activeSection === 'drive_orders' && (
           <div className="space-y-3">
             <h4 className="font-bold text-slate-800 px-1">ড্রাইভ প্যাক অর্ডার রিকোয়েস্ট ({driveOrders.length})</h4>
@@ -435,7 +435,6 @@ export default function AdminApp() {
                     </button>
                   </div>
 
-                  {/* সিম লোন চেক অপশন (হ্যাঁ/না) */}
                   <div className="flex items-center justify-between pt-2 border-t border-slate-200 bg-amber-50/60 p-2 rounded-lg">
                     <span className="font-bold text-slate-800">⚠️ এই নাম্বারে কি লোন আছে?</span>
                     <button 
@@ -585,6 +584,65 @@ export default function AdminApp() {
           </div>
         )}
 
+        {/* উন্নত History অপশন (যেখানে কে কত টাকা এড করেছে এবং কোন ইউজার রিচার্জ/ড্রাইভ দিল তার পূর্ণাঙ্গ রিপোর্ট থাকবে) */}
+        {activeSection === 'history' && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-1 bg-slate-200 p-1 rounded-xl">
+              <button onClick={() => setHistoryTab('add_money')} className={`py-1.5 rounded-lg font-bold ${historyTab === 'add_money' ? 'bg-white shadow-sm' : ''}`}>এড-মানি ({addMoneyLogs.length})</button>
+              <button onClick={() => setHistoryTab('recharge')} className={`py-1.5 rounded-lg font-bold ${historyTab === 'recharge' ? 'bg-white shadow-sm' : ''}`}>রিচার্জ ({rechargeOrders.length})</button>
+              <button onClick={() => setHistoryTab('drive')} className={`py-1.5 rounded-lg font-bold ${historyTab === 'drive' ? 'bg-white shadow-sm' : ''}`}>ড্রাইভ ({driveOrders.length})</button>
+            </div>
+
+            {historyTab === 'add_money' && (
+              <div className="space-y-2">
+                <h4 className="font-bold text-slate-800 px-1">এড-মানি হিস্ট্রি রিপোর্ট</h4>
+                {addMoneyLogs.map(log => (
+                  <div key={log.id} className="bg-white border rounded-xl p-3 flex justify-between items-center shadow-sm">
+                    <div>
+                      <p className="font-bold text-slate-900">৳{log.amount} ({log.method})</p>
+                      <p className="text-[10px] text-slate-600">👤 {log.userName} (<span className="font-mono">{log.userPhone}</span>)</p>
+                      <p className="text-[10px] text-slate-400">TrxID: <strong className="font-mono text-indigo-600">{log.trxId}</strong> • {log.time}</p>
+                    </div>
+                    <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200">{log.status}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {historyTab === 'recharge' && (
+              <div className="space-y-2">
+                <h4 className="font-bold text-slate-800 px-1">রিচার্জ হিস্ট্রি রিপোর্ট</h4>
+                {rechargeOrders.map(ord => (
+                  <div key={ord.id} className="bg-white border rounded-xl p-3 flex justify-between items-center shadow-sm">
+                    <div>
+                      <p className="font-bold text-slate-900">{ord.operator} - ৳{ord.amount}</p>
+                      <p className="text-[10px] text-slate-600">👤 {ord.userName} | লক্ষ্য নম্বর: <span className="font-mono text-indigo-600">{ord.targetNumber}</span></p>
+                      <p className="text-[10px] text-slate-400">{ord.time}</p>
+                    </div>
+                    <span className={`text-[10px] font-bold px-2 py-1 rounded-lg ${ord.status === 'Completed' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{ord.status}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {historyTab === 'drive' && (
+              <div className="space-y-2">
+                <h4 className="font-bold text-slate-800 px-1">ড্রাইভ হিস্ট্রি রিপোর্ট</h4>
+                {driveOrders.map(ord => (
+                  <div key={ord.id} className="bg-white border rounded-xl p-3 flex justify-between items-center shadow-sm">
+                    <div>
+                      <p className="font-bold text-slate-900">{ord.operator} - {ord.packageTitle} (৳{ord.price})</p>
+                      <p className="text-[10px] text-slate-600">👤 {ord.userName} | লক্ষ্য নম্বর: <span className="font-mono text-indigo-600">{ord.targetNumber}</span></p>
+                      <p className="text-[10px] text-slate-400">{ord.time}</p>
+                    </div>
+                    <span className={`text-[10px] font-bold px-2 py-1 rounded-lg ${ord.status === 'Completed' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{ord.status}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* এড মানি কন্ট্রোল */}
         {activeSection === 'add_money' && (
           <div className="space-y-3">
@@ -689,26 +747,6 @@ export default function AdminApp() {
               </div>
               <button onClick={handleSaveBalance} className="w-full py-2.5 bg-indigo-600 text-white font-bold rounded-xl">আপডেট করুন</button>
             </div>
-          </div>
-        )}
-
-        {/* হিস্ট্রি অপশন */}
-        {activeSection === 'history' && (
-          <div className="space-y-3">
-            <div className="grid grid-cols-3 gap-1 bg-slate-200 p-1 rounded-xl">
-              <button onClick={() => setHistoryTab('add_money')} className={`py-1.5 rounded-lg font-bold ${historyTab === 'add_money' ? 'bg-white shadow-sm' : ''}`}>এড-মানি</button>
-              <button onClick={() => setHistoryTab('recharge')} className={`py-1.5 rounded-lg font-bold ${historyTab === 'recharge' ? 'bg-white shadow-sm' : ''}`}>রিচার্জ</button>
-              <button onClick={() => setHistoryTab('drive')} className={`py-1.5 rounded-lg font-bold ${historyTab === 'drive' ? 'bg-white shadow-sm' : ''}`}>ড্রাইভ</button>
-            </div>
-            {historyTab === 'add_money' && addMoneyLogs.map(log => (
-              <div key={log.id} className="bg-white border rounded-xl p-2.5 flex justify-between">
-                <div>
-                  <p className="font-bold text-slate-900">৳{log.amount} ({log.method})</p>
-                  <p className="text-[10px] text-slate-500">TrxID: <strong className="font-mono text-indigo-600">{log.trxId}</strong></p>
-                </div>
-                <span className="text-[10px] text-emerald-600 font-bold">{log.status}</span>
-              </div>
-            ))}
           </div>
         )}
 
