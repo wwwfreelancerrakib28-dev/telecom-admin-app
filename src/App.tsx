@@ -5,7 +5,7 @@ import { ref, set, push, onValue, update, remove } from 'firebase/database';
 import { 
   ShieldCheck, Wallet, Flame, MessageSquare, Search, Edit3, Trash2, 
   ToggleLeft, ToggleRight, Send, ArrowLeft, History, Lock, LogOut, 
-  Radio, CheckCircle, XCircle, Copy, Check, Ban, Ticket, BellRing, Globe, FileText
+  Radio, CheckCircle, XCircle, Copy, Check, Ban, Ticket, BellRing, Globe, FileText, Smartphone, Users
 } from 'lucide-react';
 
 export default function AdminApp() {
@@ -13,7 +13,7 @@ export default function AdminApp() {
   const [adminPin, setAdminPin] = useState('');
   const [authError, setAuthError] = useState('');
 
-  const [activeSection, setActiveSection] = useState<'menu' | 'users' | 'add_money' | 'recharge_orders' | 'drive_orders' | 'offers' | 'history' | 'chats' | 'links' | 'live_users' | 'broadcast' | 'scratch_cards'>('menu');
+  const [activeSection, setActiveSection] = useState<'menu' | 'users' | 'add_money' | 'recharge_orders' | 'drive_orders' | 'offers' | 'history' | 'chats' | 'links' | 'live_users' | 'broadcast' | 'scratch_cards' | 'update_control'>('menu');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   const [customMainBalance, setCustomMainBalance] = useState('');
@@ -27,7 +27,10 @@ export default function AdminApp() {
   const [runningNotice, setRunningNotice] = useState('🎉 স্বাগতম SIM OFFER SHOP এ!');
   const [noticeInput, setNoticeInput] = useState(runningNotice);
 
-  // এড-মানি নোট স্টেট
+  // ফোর্স আপডেট কন্ট্রোল স্টেট
+  const [forceUpdateEnabled, setForceUpdateEnabled] = useState(false);
+  const [updateLink, setUpdateLink] = useState('https://play.google.com/store/apps/details?id=com.telecom.app');
+
   const [addMoneyNote, setAddMoneyNote] = useState('প্রথমে নাম্বারে টাকা পাঠিয়ে ট্রানজ্যাকশন আইডি দিন।');
   const [noteInput, setNoteInput] = useState(addMoneyNote);
 
@@ -73,6 +76,14 @@ export default function AdminApp() {
       else setOffers([]);
     });
 
+    onValue(ref(db, 'settings/forceUpdate'), (snapshot) => {
+      const val = snapshot.val();
+      if (val) {
+        if (val.enabled !== undefined) setForceUpdateEnabled(val.enabled);
+        if (val.link) setUpdateLink(val.link);
+      }
+    });
+
     onValue(ref(db, 'settings/addMoneyNote'), (snapshot) => {
       const val = snapshot.val();
       if (val) { setAddMoneyNote(val); setNoteInput(val); }
@@ -109,7 +120,20 @@ export default function AdminApp() {
       if (data) setScratchCardsList(Object.keys(data).map(key => ({ id: key, ...data[key] })));
       else setScratchCardsList([]);
     });
+
+    onValue(ref(db, 'chats'), (snapshot) => {
+      const data = snapshot.val();
+      if (data && activeChatUser) {
+        const userMsgs = data[activeChatUser.id] || [];
+        setChatMessages(Object.keys(userMsgs).map(k => ({ id: k, ...userMsgs[k] })));
+      } else { setChatMessages([]); }
+    });
   }, [activeChatUser]);
+
+  const handleUpdateSettingsSave = () => {
+    set(ref(db, 'settings/forceUpdate'), { enabled: forceUpdateEnabled, link: updateLink });
+    alert('✅ ফোর্স আপডেট সেটিংস সফলভাবে আপডেট করা হয়েছে!');
+  };
 
   const updateAddMoneyNoteInDb = () => {
     set(ref(db, 'settings/addMoneyNote'), noteInput);
@@ -173,6 +197,22 @@ export default function AdminApp() {
       <main className="flex-1 p-3 max-w-lg mx-auto w-full overflow-y-auto space-y-3">
         {activeSection === 'menu' && (
           <div className="grid grid-cols-2 gap-2.5">
+            <button onClick={() => setActiveSection('recharge_orders')} className="bg-white border rounded-2xl p-3 flex flex-col items-center text-center shadow-sm">
+              <Send className="w-5 h-5 text-sky-600 mb-1" />
+              <span className="font-bold">রিচার্জ অর্ডার</span>
+            </button>
+            <button onClick={() => setActiveSection('drive_orders')} className="bg-white border rounded-2xl p-3 flex flex-col items-center text-center shadow-sm">
+              <Flame className="w-5 h-5 text-amber-600 mb-1" />
+              <span className="font-bold">ড্রাইভ অর্ডার</span>
+            </button>
+            <button onClick={() => setActiveSection('scratch_cards')} className="bg-white border rounded-2xl p-3 flex flex-col items-center text-center shadow-sm">
+              <Ticket className="w-5 h-5 text-pink-600 mb-1" />
+              <span className="font-bold">স্ক্র্যাচ কার্ড</span>
+            </button>
+            <button onClick={() => setActiveSection('offers')} className="bg-white border rounded-2xl p-3 flex flex-col items-center text-center shadow-sm">
+              <Radio className="w-5 h-5 text-rose-600 mb-1" />
+              <span className="font-bold">ড্রাইভ প্যাক কন্ট্রোল</span>
+            </button>
             <button onClick={() => setActiveSection('history')} className="bg-white border rounded-2xl p-3 flex flex-col items-center text-center shadow-sm">
               <History className="w-5 h-5 text-violet-600 mb-1" />
               <span className="font-bold">History রিপোর্ট</span>
@@ -180,6 +220,14 @@ export default function AdminApp() {
             <button onClick={() => setActiveSection('add_money')} className="bg-white border rounded-2xl p-3 flex flex-col items-center text-center shadow-sm">
               <Wallet className="w-5 h-5 text-emerald-600 mb-1" />
               <span className="font-bold">এড মানি কন্ট্রোল ও নোট</span>
+            </button>
+            <button onClick={() => setActiveSection('users')} className="bg-white border rounded-2xl p-3 flex flex-col items-center text-center shadow-sm">
+              <Users className="w-5 h-5 text-indigo-600 mb-1" />
+              <span className="font-bold">ইউজার ম্যানেজার</span>
+            </button>
+            <button onClick={() => setActiveSection('update_control')} className="bg-white border rounded-2xl p-3 flex flex-col items-center text-center shadow-sm">
+              <Smartphone className="w-5 h-5 text-blue-600 mb-1" />
+              <span className="font-bold">Force Update কন্ট্রোল</span>
             </button>
           </div>
         )}
@@ -197,7 +245,6 @@ export default function AdminApp() {
               </button>
             </div>
 
-            {/* নোট এডিট অপশন */}
             <div className="bg-white border rounded-2xl p-3.5 space-y-2 shadow-sm">
               <h4 className="font-bold text-slate-900 border-b pb-1.5 flex items-center gap-1"><FileText className="w-3.5 h-3.5 text-indigo-600" /> এড-মানি নির্দেশিকা নোট</h4>
               <textarea value={noteInput} onChange={(e) => setNoteInput(e.target.value)} placeholder="ইউজার অ্যাপে দেখানোর জন্য নোট লিখুন..." className="w-full bg-slate-50 border rounded-xl p-2.5 h-20 text-xs" />
@@ -210,6 +257,27 @@ export default function AdminApp() {
               <input type="tel" value={paymentNumbers.nagad} onChange={(e) => setPaymentNumbers({ ...paymentNumbers, nagad: e.target.value })} placeholder="Nagad Number" className="w-full bg-slate-50 border rounded-xl p-2 text-xs font-mono font-bold" />
               <input type="tel" value={paymentNumbers.rocket} onChange={(e) => setPaymentNumbers({ ...paymentNumbers, rocket: e.target.value })} placeholder="Rocket Number" className="w-full bg-slate-50 border rounded-xl p-2 text-xs font-mono font-bold" />
               <button onClick={updateAddMoneySettings} className="w-full py-2.5 bg-indigo-600 text-white font-bold rounded-xl">নম্বরগুলো সেভ করুন</button>
+            </div>
+          </div>
+        )}
+
+        {/* ফোর্স আপডেট কন্ট্রোল পেজ */}
+        {activeSection === 'update_control' && (
+          <div className="space-y-3">
+            <div className="bg-white border rounded-2xl p-3.5 flex items-center justify-between shadow-sm">
+              <div>
+                <h4 className="font-bold text-slate-900">ফোর্স আপডেট (Force Update)</h4>
+                <p className="text-[10px] text-slate-400">চালু করলে ইউজাররা আপডেট ছাড়া অ্যাপে ঢুকতে পারবে না</p>
+              </div>
+              <button onClick={() => setForceUpdateEnabled(!forceUpdateEnabled)}>
+                {forceUpdateEnabled ? <ToggleRight className="w-7 h-7 text-emerald-600" /> : <ToggleLeft className="w-7 h-7 text-rose-600" />}
+              </button>
+            </div>
+
+            <div className="bg-white border rounded-2xl p-3.5 space-y-2 shadow-sm">
+              <h4 className="font-bold text-slate-900 border-b pb-1.5">নতুন অ্যাপ ডাউনলোড লিংক</h4>
+              <input type="text" value={updateLink} onChange={(e) => setUpdateLink(e.target.value)} placeholder="https://..." className="w-full bg-slate-50 border rounded-xl p-2.5 text-xs font-medium" />
+              <button onClick={handleUpdateSettingsSave} className="w-full py-2.5 bg-indigo-600 text-white font-bold rounded-xl">সেটিংস সেভ করুন</button>
             </div>
           </div>
         )}
