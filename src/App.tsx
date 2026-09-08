@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { db } from './firebase';
 import { ref, set, push, onValue, update, remove } from 'firebase/database';
+// এখানে User as UserIcon যুক্ত করা হয়েছে
 import { 
   ShieldCheck, Wallet, Flame, MessageSquare, Search, Edit3, Trash2, 
   ToggleLeft, ToggleRight, Send, ArrowLeft, History, Lock, LogOut, 
-  Radio, CheckCircle, XCircle, Copy, Check, Ban, Ticket, BellRing, Globe, FileText, Smartphone, Users, Sparkles, Facebook, MessageCircle
+  Radio, CheckCircle, XCircle, Copy, Check, Ban, Ticket, BellRing, Globe, FileText, Smartphone, Users, Sparkles, Facebook, MessageCircle, User as UserIcon
 } from 'lucide-react';
 
 export default function AdminApp() {
@@ -365,7 +366,6 @@ export default function AdminApp() {
       <main className="flex-1 p-3 max-w-lg mx-auto w-full overflow-y-auto space-y-4">
         {activeSection === 'menu' && (
           <div className="space-y-4">
-            {/* ড্যাশবোর্ড স্ট্যাটাস */}
             <div className="bg-gradient-to-tr from-[#1a1442] via-[#241b5c] to-[#120e2e] border border-white/10 rounded-3xl p-5 text-white shadow-2xl space-y-3 relative overflow-hidden">
               <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
               <div className="flex justify-between items-center relative z-10 border-b border-white/10 pb-2">
@@ -475,7 +475,7 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* অন্যান্য সমস্ত ভিউ যা আগেই আপডেট করা হয়েছে (Recharge, Drive, Offers, Update, etc.) */}
+        {/* রিচার্জ অর্ডার ভিউ */}
         {activeSection === 'recharge_orders' && (
           <div className="space-y-3">
             <h4 className="font-bold text-slate-300 px-1 border-b border-white/10 pb-2">রিচার্জ অর্ডার রিকোয়েস্ট ({rechargeOrders.length})</h4>
@@ -584,10 +584,7 @@ export default function AdminApp() {
             </div>
 
             <div className="bg-[#141032] border border-white/10 rounded-3xl p-5 space-y-3 shadow-xl">
-              <h4 className="font-bold text-white border-b border-white/10 pb-2 flex items-center gap-1.5">
-                <Flame className="w-3.5 h-3.5 text-rose-500" /> নতুন ড্রাইভ অফার যোগ করুন
-              </h4>
-
+              <h4 className="font-bold text-white border-b border-white/10 pb-2 flex items-center gap-1.5"><Flame className="w-4 h-4 text-rose-500" /> নতুন ড্রাইভ অফার যোগ করুন</h4>
               <div className="grid grid-cols-5 gap-1 bg-black/30 border border-white/10 p-1 rounded-xl">
                 {['Grameenphone', 'Robi', 'Banglalink', 'Airtel', 'Teletalk'].map((op) => (
                   <button key={op} type="button" onClick={() => setNewOffer({ ...newOffer, operator: op })} className={`py-2 rounded-lg font-bold text-[10px] ${newOffer.operator === op ? 'bg-indigo-600 text-white shadow' : 'text-slate-400'}`}>
@@ -595,7 +592,6 @@ export default function AdminApp() {
                   </button>
                 ))}
               </div>
-
               <input type="text" placeholder="টাইটেল (যেমন: 30 GB + 700 Min)" value={newOffer.title} onChange={(e) => setNewOffer({ ...newOffer, title: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500" />
               <div className="grid grid-cols-3 gap-2">
                 <input type="number" placeholder="মূল্য (৳)" value={newOffer.offerPrice} onChange={(e) => setNewOffer({ ...newOffer, offerPrice: e.target.value })} className="bg-black/40 border border-white/10 rounded-xl p-2.5 font-bold text-white text-center focus:outline-none focus:border-indigo-500" />
@@ -944,4 +940,4 @@ export default function AdminApp() {
       )}
     </div>
   );
-    }
+}
