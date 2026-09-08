@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { App as CapacitorApp } from '@capacitor/app';
 import { 
   ShieldCheck, 
   Users, 
@@ -37,16 +38,42 @@ export default function AdminApp() {
   const [customDriveBalance, setCustomDriveBalance] = useState('');
   const [editingUser, setEditingUser] = useState<any | null>(null);
 
-  // অপারেটর সক্রিয়/নিষ্ক্রিয় (Active/Inactive) সুইচ স্টেট
+  // ব্যাক বাটন হ্যান্ডলার (এক জায়গায় রাখা হয়েছে যাতে সব জায়গা থেকে একই নিয়মে কাজ করে)
+  const handleBack = () => {
+    if (editingUser) {
+      setEditingUser(null);
+    } else if (selectedUser) {
+      setSelectedUser(null);
+    } else if (activeSection !== 'menu') {
+      setActiveSection('menu');
+    }
+  };
+
+  // মোবাইলের নিচের ব্যাক বাটন কাজ করানোর ইভেন্ট লিসেনার
+  useEffect(() => {
+    const backListener = CapacitorApp.addListener('backButton', () => {
+      if (editingUser || selectedUser || activeSection !== 'menu') {
+        handleBack();
+      } else {
+        CapacitorApp.exitApp();
+      }
+    });
+
+    return () => {
+      backListener.then(handler => handler.remove());
+    };
+  }, [editingUser, selectedUser, activeSection]);
+
+  // সিম অপারেটর অন/অফ স্টেট
   const [operatorStatus, setOperatorStatus] = useState<Record<string, boolean>>({
     Grameenphone: true,
     Robi: true,
     Banglalink: true,
     Airtel: true,
-    Teletalk: false // ডিফল্ট বন্ধ রাখা হলো
+    Teletalk: false
   });
 
-  // ডামি ইউজার তালিকা
+  // ইউজার তালিকা
   const [usersList, setUsersList] = useState([
     {
       id: '1',
@@ -80,7 +107,6 @@ export default function AdminApp() {
     rocket: '01728116153'
   });
 
-  // অফার তালিকা
   const [offers, setOffers] = useState([
     { id: '1', operator: 'Grameenphone', title: '30 GB + 700 Min (30 Days)', offerPrice: 580, cashback: 119, note: 'শুধু চট্টগ্রাম ও ঢাকা বিভাগের জন্য' },
     { id: '2', operator: 'Robi', title: '50 GB + 1000 Min (30 Days)', offerPrice: 750, cashback: 149, note: 'অল বাংলাদেশ পাবে' },
@@ -143,15 +169,10 @@ export default function AdminApp() {
     setEditingUser(null);
   };
 
-  // নির্দিষ্ট অপারেটর চালু বা বন্ধ করার টগল
   const toggleOperatorStatus = (operator: string) => {
-    setOperatorStatus(prev => {
-      const updated = { ...prev, [operator]: !prev[operator] };
-      return updated;
-    });
+    setOperatorStatus(prev => ({ ...prev, [operator]: !prev[operator] }));
   };
 
-  // নতুন অফার যোগ হ্যান্ডলার
   const handleAddOffer = () => {
     if (!newOffer.title || !newOffer.offerPrice) {
       alert('অনুগ্রহ করে অফার টাইটেল ও মূল্য লিখুন');
@@ -182,7 +203,6 @@ export default function AdminApp() {
     u => u.phone.includes(searchQuery.trim()) || u.name.toLowerCase().includes(searchQuery.toLowerCase().trim())
   );
 
-  // সিম অনুযায়ী ব্যাজ কালার
   const getOperatorBadgeClass = (operator: string) => {
     switch (operator) {
       case 'Grameenphone': return 'bg-sky-50 text-sky-600 border-sky-200';
@@ -194,7 +214,6 @@ export default function AdminApp() {
     }
   };
 
-  // শুধুমাত্র সক্রিয় সিমের অফার ফিল্টার
   const visibleOffers = offers.filter(of => operatorStatus[of.operator] !== false);
 
   if (!isAuthenticated) {
@@ -239,15 +258,15 @@ export default function AdminApp() {
     <div className="min-h-screen bg-slate-50 flex flex-col select-none font-sans">
       <header className="bg-white border-b border-slate-200 px-4 py-3.5 flex items-center justify-between sticky top-0 z-20 shadow-sm">
         <div className="flex items-center gap-3">
-          {activeSection !== 'menu' ? (
+          {/* হেডার ব্যাক বাটন */}
+          {(activeSection !== 'menu' || selectedUser) ? (
             <button 
-              onClick={() => {
-                if (selectedUser) setSelectedUser(null);
-                else setActiveSection('menu');
-              }} 
-              className="p-2 rounded-xl hover:bg-slate-100 text-slate-700 active:scale-95"
+              type="button"
+              onClick={handleBack}
+              className="p-2 -ml-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 active:scale-90 transition-all flex items-center justify-center cursor-pointer shadow-sm"
+              title="পিছনে যান"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-5 h-5 stroke-[2.5]" />
             </button>
           ) : (
             <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center font-bold">
@@ -271,7 +290,6 @@ export default function AdminApp() {
       <main className="flex-1 p-4 max-w-lg mx-auto w-full overflow-y-auto">
         {activeSection === 'menu' && (
           <div className="space-y-4">
-            {/* কন্ট্রোল রুম ড্যাশবোর্ড কার্ড */}
             <div className="bg-gradient-to-tr from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-5 text-white shadow-xl">
               <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider bg-white/10 px-2.5 py-1 rounded-lg">
                 Admin Control Room
@@ -541,11 +559,9 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* ৩. ড্রাইভ অফার ও সিম অপারেটর অন/অফ কন্ট্রোল */}
+        {/* ৩. ড্রাইভ অফার কন্ট্রোল */}
         {activeSection === 'offers' && (
           <div className="space-y-4">
-            
-            {/* সিম অন/অফ কন্ট্রোল সুইচ বক্স */}
             <div className="bg-white border border-slate-200 rounded-3xl p-4 shadow-sm">
               <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5 mb-3">
                 <Radio className="w-4 h-4 text-indigo-600 animate-pulse" />
@@ -591,13 +607,11 @@ export default function AdminApp() {
               </div>
             </div>
 
-            {/* নতুন অফার পাবলিশ ফর্ম */}
             <div className="bg-white border rounded-3xl p-4 space-y-3 shadow-sm">
               <h4 className="text-xs font-bold text-slate-900 border-b pb-2 flex items-center gap-1.5">
                 <Flame className="w-4 h-4 text-rose-500" /> নতুন ড্রাইভ অফার তৈরি করুন
               </h4>
 
-              {/* সিম অপারেটর সিলেকশন */}
               <div>
                 <label className="text-[10px] font-bold text-slate-500 block mb-1">সিম অপারেটর নির্বাচন করুন</label>
                 <select
@@ -613,7 +627,6 @@ export default function AdminApp() {
                 </select>
               </div>
 
-              {/* অফার প্যাকেজ নাম */}
               <div>
                 <label className="text-[10px] font-bold text-slate-500 block mb-1">প্যাকেজ বিবরণ / টাইটেল</label>
                 <input 
@@ -625,7 +638,6 @@ export default function AdminApp() {
                 />
               </div>
 
-              {/* মূল্য ও কমিশন */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 block mb-1">অফার মূল্য (৳)</label>
@@ -649,7 +661,6 @@ export default function AdminApp() {
                 </div>
               </div>
 
-              {/* অফার নোট */}
               <div>
                 <label className="text-[10px] font-bold text-slate-500 block mb-1 flex items-center gap-1">
                   <FileText className="w-3 h-3 text-indigo-500" /> অফার নোট (শর্ত বা নির্দেশনা)
@@ -671,7 +682,6 @@ export default function AdminApp() {
               </button>
             </div>
 
-            {/* বর্তমান অফার তালিকা (চালু সিমের অফারগুলো দেখাচ্ছে) */}
             <div className="space-y-2.5">
               <div className="flex justify-between items-center px-1">
                 <span className="text-xs font-bold text-slate-700">চালু অফার সমূহ ({visibleOffers.length})</span>
@@ -708,7 +718,6 @@ export default function AdminApp() {
                     <button 
                       onClick={() => setOffers(offers.filter(o => o.id !== of.id))} 
                       className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors shrink-0"
-                      title="মুছে ফেলুন"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
