@@ -95,11 +95,12 @@ export default function AdminApp() {
   ]);
 
   const [rechargeOrders, setRechargeOrders] = useState([
-    { id: 'RCH-101', userName: 'User', userPhone: '01728116153', operator: 'Grameenphone', amount: 200, targetNumber: '01711223344', time: '10:45 AM', status: 'Pending', note: '' }
+    { id: 'RCH-101', userId: '1', userName: 'User', userPhone: '01728116153', userMainBal: 1400, userDriveBal: 3870, operator: 'Grameenphone', amount: 200, targetNumber: '01711223344', time: '10:45 AM', status: 'Pending', note: '' }
   ]);
 
+  // ড্রাইভ অর্ডারে সিম লোন স্ট্যাটাস (hasLoan: true/false) যোগ করা হয়েছে
   const [driveOrders, setDriveOrders] = useState([
-    { id: 'DRV-201', userName: 'User', userPhone: '01728116153', operator: 'Grameenphone', packageTitle: '30 GB + 700 Min', price: 580, targetNumber: '01711223344', time: '12:00 PM', status: 'Pending', note: '' }
+    { id: 'DRV-201', userId: '1', userName: 'User', userPhone: '01728116153', userMainBal: 1400, userDriveBal: 3870, operator: 'Grameenphone', packageTitle: '30 GB + 700 Min', price: 580, targetNumber: '01711223344', time: '12:00 PM', status: 'Pending', hasLoan: false, note: '' }
   ]);
 
   const pendingRechargeCount = rechargeOrders.filter(o => o.status === 'Pending').length;
@@ -181,6 +182,20 @@ export default function AdminApp() {
 
   const toggleUserBan = (userId: string) => {
     setUsersList(prev => prev.map(u => u.id === userId ? { ...u, isBanned: !u.isBanned } : u));
+  };
+
+  // ড্রাইভ অর্ডারে লোন টগল করার ফাংশন (হ্যাঁ/না)
+  const toggleDriveLoanStatus = (id: string) => {
+    setDriveOrders(prev => prev.map(o => o.id === id ? { ...o, hasLoan: !o.hasLoan } : o));
+  };
+
+  // ড্রাইভ কমপ্লিট করার সময় লোন চেক করা
+  const handleCompleteDrive = (ord: any) => {
+    if (ord.hasLoan) {
+      alert('⚠️ এই নম্বরে লোন আছে! লোন থাকা অবস্থায় ড্রাইভ কমপ্লিট করা যাবে না। প্রথমে লোন পরিশোধ করতে বলুন।');
+      return;
+    }
+    completeDriveOrder(ord.id);
   };
 
   const handleAddOffer = () => {
@@ -269,7 +284,6 @@ export default function AdminApp() {
       <main className="flex-1 p-3 max-w-lg mx-auto w-full overflow-y-auto space-y-3">
         {activeSection === 'menu' && (
           <div className="space-y-3">
-            {/* খুব ছোট এক লাইনের কমপ্যাক্ট মেট্রিক্স কার্ড (ইউজার ও সার্চ এবং মোট ব্যালেন্সসহ) */}
             <div className="bg-gradient-to-tr from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-3 text-white shadow-lg space-y-2">
               <div className="flex justify-between items-center text-[10px] text-slate-300 font-bold border-b border-white/10 pb-1">
                 <span>📊 SYSTEM METRICS</span>
@@ -295,7 +309,6 @@ export default function AdminApp() {
               </div>
             </div>
 
-            {/* মূল সার্ভিসগুলো */}
             <div className="grid grid-cols-2 gap-2.5">
               <button onClick={() => setActiveSection('recharge_orders')} className="bg-white border rounded-2xl p-3 flex flex-col items-center text-center shadow-sm active:scale-95 relative">
                 {pendingRechargeCount > 0 && (
@@ -355,6 +368,97 @@ export default function AdminApp() {
                 <span className="text-[9px] text-slate-400">সবার অ্যাপে নোটিশ</span>
               </button>
             </div>
+          </div>
+        )}
+
+        {/* রিচার্জ অর্ডার */}
+        {activeSection === 'recharge_orders' && (
+          <div className="space-y-3">
+            <h4 className="font-bold text-slate-800 px-1">ফ্লেক্সিলোড / রিচার্জ অর্ডার রিকোয়েস্ট ({rechargeOrders.length})</h4>
+            {rechargeOrders.map((ord) => (
+              <div key={ord.id} className="bg-white border rounded-2xl p-3.5 space-y-2.5 shadow-sm">
+                <div className="flex justify-between items-center border-b pb-2">
+                  <span className="font-black text-slate-900 text-xs bg-sky-50 text-sky-700 px-2 py-0.5 rounded border border-sky-200">{ord.operator} - ৳{ord.amount}</span>
+                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-lg ${ord.status === 'Completed' ? 'bg-emerald-50 text-emerald-700' : ord.status === 'Cancelled' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700'}`}>{ord.status}</span>
+                </div>
+
+                <div className="bg-slate-50 border rounded-xl p-2.5 space-y-1.5 text-[11px]">
+                  <p className="text-slate-700">👤 ইউজারের নাম: <strong className="text-slate-900">{ord.userName}</strong></p>
+                  <p className="text-slate-700">📱 অ্যাকাউন্ট নম্বর: <strong className="font-mono text-slate-900">{ord.userPhone}</strong></p>
+                  <p className="text-slate-700">💰 ব্যালেন্স: <span className="font-mono text-amber-600 font-bold">মেইন: ৳{ord.userMainBal}</span> | <span className="font-mono text-indigo-600 font-bold">ড্রাইভ: ৳{ord.userDriveBal}</span></p>
+                  
+                  <div className="flex items-center justify-between pt-1.5 border-t border-slate-200">
+                    <span className="text-slate-700">🎯 প্রেরণের নম্বর: <strong className="font-mono text-indigo-700 text-xs">{ord.targetNumber}</strong></span>
+                    <button onClick={() => handleCopyCardPin(ord.targetNumber, ord.id)} className="px-2.5 py-1 bg-indigo-600 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 active:scale-95">
+                      {copiedId === ord.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      <span>{copiedId === ord.id ? 'কপি হয়েছে!' : 'নম্বর কপি'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {ord.status === 'Pending' && (
+                  <div className="flex gap-2 pt-1">
+                    <button onClick={() => completeRechargeOrder(ord.id)} className="flex-1 py-2 bg-emerald-600 text-white font-bold rounded-xl flex items-center justify-center gap-1">
+                      <CheckCircle className="w-3.5 h-3.5" /> Complete
+                    </button>
+                    <button onClick={() => setCancellingOrder({ ...ord, type: 'recharge' })} className="flex-1 py-2 bg-rose-600 text-white font-bold rounded-xl flex items-center justify-center gap-1">
+                      <XCircle className="w-3.5 h-3.5" /> Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ড্রাইভ অর্ডার (যেখানে সিম লোন চেক বক্স ও হ্যাঁ/না অপশন যুক্ত করা হয়েছে) */}
+        {activeSection === 'drive_orders' && (
+          <div className="space-y-3">
+            <h4 className="font-bold text-slate-800 px-1">ড্রাইভ প্যাক অর্ডার রিকোয়েস্ট ({driveOrders.length})</h4>
+            {driveOrders.map((ord) => (
+              <div key={ord.id} className="bg-white border rounded-2xl p-3.5 space-y-2.5 shadow-sm">
+                <div className="flex justify-between items-center border-b pb-2">
+                  <span className="font-black text-slate-900 text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-200">{ord.operator} - {ord.packageTitle} (৳{ord.price})</span>
+                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-lg ${ord.status === 'Completed' ? 'bg-emerald-50 text-emerald-700' : ord.status === 'Cancelled' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700'}`}>{ord.status}</span>
+                </div>
+
+                <div className="bg-slate-50 border rounded-xl p-2.5 space-y-1.5 text-[11px]">
+                  <p className="text-slate-700">👤 ইউজারের নাম: <strong className="text-slate-900">{ord.userName}</strong></p>
+                  <p className="text-slate-700">📱 অ্যাকাউন্ট নম্বর: <strong className="font-mono text-slate-900">{ord.userPhone}</strong></p>
+                  <p className="text-slate-700">💰 ব্যালেন্স: <span className="font-mono text-amber-600 font-bold">মেইন: ৳{ord.userMainBal}</span> | <span className="font-mono text-indigo-600 font-bold">ড্রাইভ: ৳{ord.userDriveBal}</span></p>
+                  
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-200">
+                    <span className="text-slate-700">🎯 প্রেরণের নম্বর: <strong className="font-mono text-indigo-700 text-xs">{ord.targetNumber}</strong></span>
+                    <button onClick={() => handleCopyCardPin(ord.targetNumber, ord.id)} className="px-2.5 py-1 bg-indigo-600 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 active:scale-95">
+                      {copiedId === ord.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      <span>{copiedId === ord.id ? 'কপি হয়েছে!' : 'নম্বর কপি'}</span>
+                    </button>
+                  </div>
+
+                  {/* সিম লোন চেক অপশন (হ্যাঁ/না) */}
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-200 bg-amber-50/60 p-2 rounded-lg">
+                    <span className="font-bold text-slate-800">⚠️ এই নাম্বারে কি লোন আছে?</span>
+                    <button 
+                      onClick={() => toggleDriveLoanStatus(ord.id)}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${ord.hasLoan ? 'bg-rose-600 text-white shadow-sm' : 'bg-emerald-600 text-white shadow-sm'}`}
+                    >
+                      {ord.hasLoan ? 'হ্যাঁ (Loan আছে)' : 'না (Loan নাই)'}
+                    </button>
+                  </div>
+                </div>
+
+                {ord.status === 'Pending' && (
+                  <div className="flex gap-2 pt-1">
+                    <button onClick={() => handleCompleteDrive(ord)} className="flex-1 py-2 bg-emerald-600 text-white font-bold rounded-xl flex items-center justify-center gap-1">
+                      <CheckCircle className="w-3.5 h-3.5" /> Complete
+                    </button>
+                    <button onClick={() => setCancellingOrder({ ...ord, type: 'drive' })} className="flex-1 py-2 bg-rose-600 text-white font-bold rounded-xl flex items-center justify-center gap-1">
+                      <XCircle className="w-3.5 h-3.5" /> Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
 
@@ -467,7 +571,21 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* এড মানি কন্ট্রোল ও নম্বর পরিবর্তন */}
+        {/* ক্যানসেল নোট মডাল */}
+        {cancellingOrder && (
+          <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl p-4 max-w-xs w-full space-y-2.5 shadow-2xl">
+              <h4 className="font-bold text-slate-900 border-b pb-1.5">অর্ডার ক্যানসেল নোট</h4>
+              <textarea placeholder="কারণ লিখুন (ঐচ্ছিক)..." value={cancelNote} onChange={(e) => setCancelNote(e.target.value)} className="w-full bg-slate-50 border rounded-xl p-2 h-16" />
+              <div className="flex gap-2">
+                <button onClick={() => setCancellingOrder(null)} className="flex-1 py-2 bg-slate-100 rounded-xl font-bold">ফিরে যান</button>
+                <button onClick={() => submitCancelOrder(cancellingOrder.type)} className="flex-1 py-2 bg-rose-600 text-white font-bold rounded-xl">ক্যানসেল</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* এড মানি কন্ট্রোল */}
         {activeSection === 'add_money' && (
           <div className="space-y-3">
             <div className="bg-white border rounded-2xl p-3.5 flex items-center justify-between shadow-sm">
@@ -574,73 +692,7 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* রিচার্জ অর্ডার */}
-        {activeSection === 'recharge_orders' && (
-          <div className="space-y-2.5">
-            {rechargeOrders.map((ord) => (
-              <div key={ord.id} className="bg-white border rounded-2xl p-3 space-y-2">
-                <div className="flex justify-between font-bold">
-                  <span>{ord.operator} - ৳{ord.amount}</span>
-                  <span className={`text-[9px] px-1.5 py-0.5 rounded ${ord.status === 'Completed' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{ord.status}</span>
-                </div>
-                <div className="bg-slate-50 border rounded-xl p-2 flex justify-between items-center">
-                  <span className="font-mono text-indigo-700 font-bold">{ord.targetNumber}</span>
-                  <button onClick={() => handleCopyCardPin(ord.targetNumber, ord.id)} className="px-2 py-1 bg-indigo-600 text-white rounded-lg text-[10px] font-bold flex items-center gap-1">
-                    {copiedId === ord.id ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />} কপি
-                  </button>
-                </div>
-                {ord.status === 'Pending' && (
-                  <div className="flex gap-1.5">
-                    <button onClick={() => completeRechargeOrder(ord.id)} className="flex-1 py-1.5 bg-emerald-600 text-white font-bold rounded-lg">Complete</button>
-                    <button onClick={() => setCancellingOrder({ ...ord, type: 'recharge' })} className="flex-1 py-1.5 bg-rose-600 text-white font-bold rounded-lg">Cancel</button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* ড্রাইভ অর্ডার */}
-        {activeSection === 'drive_orders' && (
-          <div className="space-y-2.5">
-            {driveOrders.map((ord) => (
-              <div key={ord.id} className="bg-white border rounded-2xl p-3 space-y-2">
-                <div className="flex justify-between font-bold">
-                  <span>{ord.operator} - {ord.packageTitle} (৳{ord.price})</span>
-                  <span className={`text-[9px] px-1.5 py-0.5 rounded ${ord.status === 'Completed' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{ord.status}</span>
-                </div>
-                <div className="bg-slate-50 border rounded-xl p-2 flex justify-between items-center">
-                  <span className="font-mono text-indigo-700 font-bold">{ord.targetNumber}</span>
-                  <button onClick={() => handleCopyCardPin(ord.targetNumber, ord.id)} className="px-2 py-1 bg-indigo-600 text-white rounded-lg text-[10px] font-bold flex items-center gap-1">
-                    {copiedId === ord.id ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />} কপি
-                  </button>
-                </div>
-                {ord.status === 'Pending' && (
-                  <div className="flex gap-1.5">
-                    <button onClick={() => completeDriveOrder(ord.id)} className="flex-1 py-1.5 bg-emerald-600 text-white font-bold rounded-lg">Complete</button>
-                    <button onClick={() => setCancellingOrder({ ...ord, type: 'drive' })} className="flex-1 py-1.5 bg-rose-600 text-white font-bold rounded-lg">Cancel</button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* ক্যানসেল নোট মডাল */}
-        {cancellingOrder && (
-          <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl p-4 max-w-xs w-full space-y-2.5 shadow-2xl">
-              <h4 className="font-bold text-slate-900 border-b pb-1.5">অর্ডার ক্যানসেল নোট</h4>
-              <textarea placeholder="কারণ লিখুন (ঐচ্ছিক)..." value={cancelNote} onChange={(e) => setCancelNote(e.target.value)} className="w-full bg-slate-50 border rounded-xl p-2 h-16" />
-              <div className="flex gap-2">
-                <button onClick={() => setCancellingOrder(null)} className="flex-1 py-2 bg-slate-100 rounded-xl font-bold">ফিরে যান</button>
-                <button onClick={() => submitCancelOrder(cancellingOrder.type)} className="flex-1 py-2 bg-rose-600 text-white font-bold rounded-xl">ক্যানসেল</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* হিস্ট্রি অপشن */}
+        {/* হিস্ট্রি অপশন */}
         {activeSection === 'history' && (
           <div className="space-y-3">
             <div className="grid grid-cols-3 gap-1 bg-slate-200 p-1 rounded-xl">
