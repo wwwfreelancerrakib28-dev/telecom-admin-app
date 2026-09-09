@@ -305,6 +305,11 @@ export default function AdminApp() {
     setReplyText('');
   };
 
+  const handleOpenUser = (u: any) => {
+    setSelectedUser(u);
+    setCustomMainBalance((u.balance || u.mainBalance || 0).toString());
+  };
+
   const handleOpenUserByPhone = (phone: string) => {
     const found = usersList.find(u => u.phone === phone);
     if (found) {
@@ -405,7 +410,6 @@ export default function AdminApp() {
                 <span className="text-[10px] font-bold text-purple-300 uppercase">📊 SYSTEM METRICS</span>
               </div>
               <div className="grid grid-cols-3 gap-2 relative z-10 text-center">
-                {/* মোট ইউজার কার্ডে ক্লিক করলে সরাসরি ইউজার লিস্ট ওপেন হবে */}
                 <div onClick={() => setActiveSection('users')} className="bg-black/30 border border-white/10 rounded-2xl p-2.5 cursor-pointer hover:bg-white/5 transition-all">
                   <span className="text-[9px] text-slate-400 block mb-0.5">মোট ইউজার</span>
                   <strong className="text-sm font-black text-white font-mono">{appStats.activeAccounts}</strong>
@@ -483,7 +487,6 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* ইউজার ম্যানেজার (সকল ইউজারের তালিকা ও মোট ইউজার কাউন্ট) */}
         {activeSection === 'users' && !selectedUser && (
           <div className="space-y-3 pb-6">
             <div className="bg-[#141032] border border-white/10 rounded-2xl p-3 flex justify-between items-center text-white">
@@ -518,7 +521,6 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* ইউজার প্রফাইল ডিটেইলস ও মডিফিকেশন */}
         {activeSection === 'users' && selectedUser && (
           <div className="space-y-4 pb-6">
             <div className="bg-[#141032] border border-white/10 rounded-3xl p-5 text-center space-y-3 shadow-xl text-white">
@@ -562,7 +564,6 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* বড় ছবি প্রিভিউ মডাল */}
         {previewImage && (
           <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
             <div className="relative max-w-sm w-full text-center space-y-3">
@@ -573,7 +574,6 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* সাপোর্ট ও সোশ্যাল লিংক সেটিংস */}
         {activeSection === 'links' && (
           <div className="space-y-4">
             <div className="bg-[#141032] border border-white/10 rounded-3xl p-5 flex items-center justify-between shadow-xl">
@@ -598,7 +598,6 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* নতুন এড-মানি অর্ডার সেকশন */}
         {activeSection === 'add_money_orders' && (
           <div className="space-y-3 pb-6">
             <h4 className="font-bold text-slate-300 px-1 border-b border-white/10 pb-2">নতুন এড-মানি রিকোয়েস্ট ({pendingAddMoneyLogs.length})</h4>
@@ -624,7 +623,6 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* রিচার্জ অর্ডার (ইউজার প্রফাইল ছবি, নম্বর ও ব্যালেন্স সহ ক্লিক করলে প্রোফাইলে প্রবেশ) */}
         {activeSection === 'recharge_orders' && (
           <div className="space-y-3 pb-6">
             <h4 className="font-bold text-slate-300 px-1 border-b border-white/10 pb-2">পেন্ডিং রিচার্জ রিকোয়েস্ট ({pendingRechargeOrders.length})</h4>
@@ -640,7 +638,6 @@ export default function AdminApp() {
                     </span>
                   </div>
                   
-                  {/* ইউজার প্রফাইল ইনফো (ক্লিক করলে প্রোফাইলে যাবে) */}
                   <div onClick={() => matchedUser && handleOpenUser(matchedUser)} className="bg-black/30 border border-white/10 rounded-2xl p-3 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-all">
                     <div className="flex items-center gap-2.5">
                       <div className="w-9 h-9 rounded-full overflow-hidden bg-indigo-500/20 border border-white/20 shrink-0 flex items-center justify-center font-bold">
@@ -671,7 +668,6 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* ড্রাইভ অর্ডার (ইউজার প্রফাইল ছবি, নম্বর ও ব্যালেন্স সহ) */}
         {activeSection === 'drive_orders' && (
           <div className="space-y-3 pb-6">
             <h4 className="font-bold text-slate-300 px-1 border-b border-white/10 pb-2">পেন্ডিং ড্রাইভ প্যাক রিকোয়েস্ট ({pendingDriveOrders.length})</h4>
@@ -1083,4 +1079,4 @@ export default function AdminApp() {
       )}
     </div>
   );
-}
+            }
