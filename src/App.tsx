@@ -5,7 +5,7 @@ import { ref, set, push, onValue, update, remove } from 'firebase/database';
 import { 
   ShieldCheck, Wallet, Flame, MessageSquare, Search, Edit3, Trash2, 
   ToggleLeft, ToggleRight, Send, ArrowLeft, History, Lock, LogOut, 
-  Radio, CheckCircle, XCircle, Copy, Check, Ban, Ticket, BellRing, Globe, FileText, Smartphone, Users, Sparkles, Facebook, MessageCircle, User as UserIcon, Clock, Eye, X, MapPin
+  Radio, CheckCircle, XCircle, Copy, Check, Ban, Ticket, BellRing, Globe, FileText, Smartphone, Users, Sparkles, Facebook, MessageCircle, User as UserIcon, Clock, Eye, X, MapPin, Activity
 } from 'lucide-react';
 
 export default function AdminApp() {
@@ -13,7 +13,7 @@ export default function AdminApp() {
   const [adminPin, setAdminPin] = useState('');
   const [authError, setAuthError] = useState('');
 
-  const [activeSection, setActiveSection] = useState<'menu' | 'users' | 'add_money' | 'add_money_orders' | 'recharge_orders' | 'drive_orders' | 'offers' | 'history' | 'chats' | 'broadcast' | 'scratch_cards' | 'update_control' | 'links'>('menu');
+  const [activeSection, setActiveSection] = useState<'menu' | 'users' | 'add_money' | 'add_money_orders' | 'recharge_orders' | 'drive_orders' | 'offers' | 'history' | 'chats' | 'broadcast' | 'scratch_cards' | 'update_control' | 'links' | 'online_users'>('menu');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   const [customMainBalance, setCustomMainBalance] = useState('');
@@ -351,11 +351,15 @@ export default function AdminApp() {
     }
   };
 
-  const appStats = {
-    totalInstalls: usersList.length + 300,
-    activeAccounts: usersList.length,
-    totalBalance: usersList.reduce((acc, u) => acc + (Number(u.balance || u.mainBalance) || 0), 18500)
-  };
+  // রিয়েল মোট ব্যালেন্স (সব ইউজারের ব্যালেন্সের যোগফল) এবং রিয়েল মোট ইনস্টল সংখ্যা
+  const totalRealBalance = usersList.reduce((acc, u) => acc + (Number(u.balance || u.mainBalance) || 0), 0);
+  const totalInstalls = usersList.length;
+
+  // যারা বর্তমানে অনলাইনে বা অ্যাপে ব্রাউজ করছে (গত ২ মিনিটের মধ্যে অ্যাক্টিভিটি রয়েছে)
+  const onlineUsersList = usersList.filter(u => {
+    if (!u.lastActive) return false;
+    return (Date.now() - u.lastActive) < 120000;
+  });
 
   const pendingRechargeOrders = rechargeOrders.filter(o => o.status === 'Pending');
   const pendingDriveOrders = driveOrders.filter(o => o.status === 'Pending');
@@ -408,19 +412,22 @@ export default function AdminApp() {
               <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
               <div className="flex justify-between items-center relative z-10 border-b border-white/10 pb-2">
                 <span className="text-[10px] font-bold text-purple-300 uppercase">📊 SYSTEM METRICS</span>
+                <button onClick={() => setActiveSection('online_users')} className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-lg flex items-center gap-1 active:scale-95">
+                  <Activity className="w-3 h-3 animate-pulse" /> অনলাইনে: {onlineUsersList.length} জন
+                </button>
               </div>
               <div className="grid grid-cols-3 gap-2 relative z-10 text-center">
                 <div onClick={() => setActiveSection('users')} className="bg-black/30 border border-white/10 rounded-2xl p-2.5 cursor-pointer hover:bg-white/5 transition-all">
                   <span className="text-[9px] text-slate-400 block mb-0.5">মোট ইউজার</span>
-                  <strong className="text-sm font-black text-white font-mono">{appStats.activeAccounts}</strong>
+                  <strong className="text-sm font-black text-white font-mono">{usersList.length}</strong>
                 </div>
                 <div className="bg-black/30 border border-white/10 rounded-2xl p-2.5">
                   <span className="text-[9px] text-slate-400 block mb-0.5">টোটাল ব্যালেন্স</span>
-                  <strong className="text-sm font-black text-amber-400 font-mono">৳{appStats.totalBalance}</strong>
+                  <strong className="text-sm font-black text-amber-400 font-mono">৳{totalRealBalance}</strong>
                 </div>
                 <div className="bg-black/30 border border-white/10 rounded-2xl p-2.5">
                   <span className="text-[9px] text-slate-400 block mb-0.5">ইনস্টল</span>
-                  <strong className="text-sm font-black text-indigo-300 font-mono">{appStats.totalInstalls}</strong>
+                  <strong className="text-sm font-black text-indigo-300 font-mono">{totalInstalls}</strong>
                 </div>
               </div>
             </div>
@@ -487,6 +494,33 @@ export default function AdminApp() {
           </div>
         )}
 
+        {/* বর্তমানে অ্যাপে কারা অনলাইনে আছে */}
+        {activeSection === 'online_users' && (
+          <div className="space-y-3 pb-6">
+            <h4 className="font-bold text-slate-300 px-1 border-b border-white/10 pb-2 flex items-center justify-between">
+              <span>বর্তমানে অ্যাপে সক্রিয় ইউজারগণ</span>
+              <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-400 rounded-xl text-[10px] font-mono">{onlineUsersList.length} জন অনলাইন</span>
+            </h4>
+            {onlineUsersList.length === 0 && <div className="text-center text-slate-500 py-6">এই মুহূর্তে কেউ অ্যাপ ব্রাউজ করছে না</div>}
+            {onlineUsersList.map(u => (
+              <div key={u.id} onClick={() => handleOpenUser(u)} className="bg-[#141032] border border-white/10 rounded-2xl p-4 flex items-center justify-between shadow-lg cursor-pointer hover:bg-white/5 text-white">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full overflow-hidden bg-indigo-500/20 border border-emerald-500/40 shrink-0 flex items-center justify-center font-bold relative">
+                    {u.profilePic ? <img src={u.profilePic} alt="" className="w-full h-full object-cover" /> : u.name?.charAt(0)}
+                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-[#141032] rounded-full" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm">{u.name}</h4>
+                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">📱 {u.phone} | 📍 {u.district || 'N/A'}</p>
+                    <p className="text-[10px] text-emerald-400 font-mono mt-0.5">স্ট্যাটাস: অ্যাপ ব্রাউজ করছেন</p>
+                  </div>
+                </div>
+                <span className="text-[10px] text-indigo-400 font-bold underline">প্রোফাইল দেখুন</span>
+              </div>
+            ))}
+          </div>
+        )}
+
         {activeSection === 'users' && !selectedUser && (
           <div className="space-y-3 pb-6">
             <div className="bg-[#141032] border border-white/10 rounded-2xl p-3 flex justify-between items-center text-white">
@@ -521,6 +555,7 @@ export default function AdminApp() {
           </div>
         )}
 
+        {/* ইউজার প্রফাইল ডিটেইলস ও তার সম্পূর্ণ লেনদেন হিস্ট্রি */}
         {activeSection === 'users' && selectedUser && (
           <div className="space-y-4 pb-6">
             <div className="bg-[#141032] border border-white/10 rounded-3xl p-5 text-center space-y-3 shadow-xl text-white">
@@ -560,6 +595,52 @@ export default function AdminApp() {
                 <button onClick={() => handleDeleteUser(selectedUser.id)} className="py-3 bg-rose-600 text-white font-bold rounded-xl shadow">ডিলিট একাউন্ট</button>
               </div>
               <button onClick={handleSaveUserChanges} className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-xl shadow-lg active:scale-95">পরিবর্তন সেভ করুন</button>
+            </div>
+
+            {/* এই ইউজারের সম্পূর্ণ লেনদেন হিস্ট্রি */}
+            <div className="bg-[#141032] border border-white/10 rounded-3xl p-5 space-y-3 shadow-xl text-white">
+              <h4 className="font-bold border-b border-white/10 pb-2">এই ইউজারের সম্পূর্ণ লেনদেন হিস্ট্রি</h4>
+              
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                {addMoneyLogs.filter(l => l.userPhone === selectedUser.phone).length === 0 &&
+                 rechargeOrders.filter(o => o.userPhone === selectedUser.phone).length === 0 &&
+                 driveOrders.filter(o => o.userPhone === selectedUser.phone).length === 0 && (
+                  <p className="text-center text-slate-500 py-4 text-[11px]">কোনো লেনদেন হিস্ট্রি নেই</p>
+                )}
+
+                {/* এড-মানি লগস */}
+                {addMoneyLogs.filter(l => l.userPhone === selectedUser.phone).map(log => (
+                  <div key={log.id} className="bg-black/30 border border-white/10 rounded-xl p-3 flex justify-between items-center text-[11px]">
+                    <div>
+                      <p className="font-bold text-emerald-400">Add Money: ৳{log.amount} ({log.method})</p>
+                      <p className="text-[9px] text-slate-400 font-mono">TrxID: {log.trxId} | {log.time}</p>
+                    </div>
+                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-lg border ${log.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-amber-500/10 text-amber-400 border-amber-500/30'}`}>{log.status}</span>
+                  </div>
+                ))}
+
+                {/* রিচার্জ অর্ডার */}
+                {rechargeOrders.filter(o => o.userPhone === selectedUser.phone).map(ord => (
+                  <div key={ord.id} className="bg-black/30 border border-white/10 rounded-xl p-3 flex justify-between items-center text-[11px]">
+                    <div>
+                      <p className="font-bold text-sky-400">Flexiload ({ord.operator}): ৳{ord.amount}</p>
+                      <p className="text-[9px] text-slate-400 font-mono">Target: {ord.targetNumber} | {ord.time}</p>
+                    </div>
+                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-lg border ${ord.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-amber-500/10 text-amber-400 border-amber-500/30'}`}>{ord.status}</span>
+                  </div>
+                ))}
+
+                {/* ড্রাইভ অর্ডার */}
+                {driveOrders.filter(o => o.userPhone === selectedUser.phone).map(ord => (
+                  <div key={ord.id} className="bg-black/30 border border-white/10 rounded-xl p-3 flex justify-between items-center text-[11px]">
+                    <div>
+                      <p className="font-bold text-amber-400">Drive ({ord.operator}): ৳{ord.price}</p>
+                      <p className="text-[9px] text-slate-400 font-mono">{ord.packageTitle} | {ord.time}</p>
+                    </div>
+                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-lg border ${ord.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-amber-500/10 text-amber-400 border-amber-500/30'}`}>{ord.status}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -1079,4 +1160,4 @@ export default function AdminApp() {
       )}
     </div>
   );
-            }
+}
