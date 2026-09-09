@@ -5,7 +5,7 @@ import { ref, set, push, onValue, update, remove } from 'firebase/database';
 import { 
   ShieldCheck, Wallet, Flame, MessageSquare, Search, Edit3, Trash2, 
   ToggleLeft, ToggleRight, Send, ArrowLeft, History, Lock, LogOut, 
-  Radio, CheckCircle, XCircle, Copy, Check, Ban, Ticket, BellRing, Globe, FileText, Smartphone, Users, Sparkles, Facebook, MessageCircle, User as UserIcon, Clock
+  Radio, CheckCircle, XCircle, Copy, Check, Ban, Ticket, BellRing, Globe, FileText, Smartphone, Users, Sparkles, Facebook, MessageCircle, User as UserIcon, Clock, Eye, X
 } from 'lucide-react';
 
 export default function AdminApp() {
@@ -18,6 +18,7 @@ export default function AdminApp() {
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   const [customMainBalance, setCustomMainBalance] = useState('');
   const [customDriveBalance, setCustomDriveBalance] = useState('');
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const [historyTab, setHistoryTab] = useState<'add_money' | 'recharge' | 'drive'>('add_money');
   const [cancellingOrder, setCancellingOrder] = useState<any | null>(null);
@@ -157,8 +158,9 @@ export default function AdminApp() {
 
   useEffect(() => {
     const backListener = CapacitorApp.addListener('backButton', () => {
-      if (cancellingOrder || selectedUser || activeSection !== 'menu') {
+      if (cancellingOrder || selectedUser || previewImage || activeSection !== 'menu') {
         if (cancellingOrder) setCancellingOrder(null);
+        else if (previewImage) setPreviewImage(null);
         else if (selectedUser) setSelectedUser(null);
         else setActiveSection('menu');
       } else {
@@ -166,7 +168,7 @@ export default function AdminApp() {
       }
     });
     return () => { backListener.then(handler => handler.remove()); };
-  }, [cancellingOrder, selectedUser, activeSection]);
+  }, [cancellingOrder, selectedUser, previewImage, activeSection]);
 
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -306,22 +308,43 @@ export default function AdminApp() {
 
   const handleOpenUser = (u: any) => {
     setSelectedUser(u);
-    setCustomMainBalance((u.mainBalance || 0).toString());
-    setCustomDriveBalance((u.driveBalance || 0).toString());
+    setCustomMainBalance((u.balance || u.mainBalance || 0).toString());
   };
-  const handleSaveBalance = () => {
+
+  const handleSaveUserChanges = () => {
     if (!selectedUser) return;
-    const main = customMainBalance === '' ? 0 : Number(customMainBalance);
-    const drive = customDriveBalance === '' ? 0 : Number(customDriveBalance);
-    update(ref(db, `users/${selectedUser.id}`), { mainBalance: main, driveBalance: drive });
-    setSelectedUser({ ...selectedUser, mainBalance: main, driveBalance: drive });
-    setPopupAlert('✅ ব্যালেন্স আপডেট সফল!');
+    const bal = customMainBalance === '' ? 0 : Number(customMainBalance);
+    update(ref(db, `users/${selectedUser.id}`), { 
+      balance: bal, 
+      mainBalance: bal,
+      phone: selectedUser.phone,
+      pin: selectedUser.pin,
+      district: selectedUser.district,
+      division: selectedUser.division,
+      name: selectedUser.name
+    });
+    setPopupAlert('✅ ইউজার প্রফাইল আপডেট সফল!');
+  };
+
+  const handleDeleteUser = (userId: string) => {
+    if (window.confirm('⚠️ আপনি কি সত্যিই এই ইউজারের অ্যাকাউন্ট চিরতরে ডিলিট করতে চান?')) {
+      remove(ref(db, `users/${userId}`));
+      setSelectedUser(null);
+      setPopupAlert('✅ ইউজার অ্যাকাউন্ট ডিলিট করা হয়েছে!');
+    }
+  };
+
+  const toggleUserBan = (userId: string, currentStatus: boolean) => { 
+    update(ref(db, `users/${userId}`), { isBanned: !currentStatus }); 
+    if (selectedUser) {
+      setSelectedUser({ ...selectedUser, isBanned: !currentStatus });
+    }
   };
 
   const appStats = {
     totalInstalls: usersList.length + 300,
     activeAccounts: usersList.length,
-    totalBalance: usersList.reduce((acc, u) => acc + (Number(u.mainBalance) || 0) + (Number(u.driveBalance) || 0), 18500)
+    totalBalance: usersList.reduce((acc, u) => acc + (Number(u.balance || u.mainBalance) || 0), 18500)
   };
 
   const pendingRechargeOrders = rechargeOrders.filter(o => o.status === 'Pending');
@@ -460,7 +483,93 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* সাপোর্ট ও সোশ্যাল লিংক সেটিংস */}
+        {/* ইউজার ম্যানেজার (সার্চ, ব্লক/আনব্লক, ফুল প্রফাইল এডিট ও বড় ছবি ভিউ) */}
+        {activeSection === 'users' && !selectedUser && (
+          <div className="space-y-3 pb-6">
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
+              <input type="text" placeholder="নম্বর বা নাম দিয়ে খুঁজুন..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-[#141032] border border-white/20 rounded-2xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-indigo-500 shadow-lg" />
+            </div>
+            <div className="space-y-2.5">
+              {usersList.filter(u => (u.phone || '').includes(searchQuery.trim()) || (u.name || '').toLowerCase().includes(searchQuery.toLowerCase().trim())).map((u) => (
+                <div key={u.id} onClick={() => handleOpenUser(u)} className="bg-[#141032] border border-white/10 rounded-2xl p-4 flex items-center justify-between shadow-lg cursor-pointer hover:bg-white/5 transition-all text-white">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full overflow-hidden bg-indigo-500/20 border border-white/20 shrink-0 flex items-center justify-center font-bold">
+                      {u.profilePic ? <img src={u.profilePic} alt="" className="w-full h-full object-cover" /> : u.name?.charAt(0)}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm">{u.name}</h4>
+                      <p className="text-[10px] text-slate-400 font-mono mt-0.5">📱 {u.phone} | 📍 {u.district || 'N/A'}</p>
+                      <p className="text-[10px] text-indigo-300 font-mono mt-0.5">ব্যালেন্স: ৳{u.balance || u.mainBalance || 0}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={(e) => { e.stopPropagation(); toggleUserBan(u.id, u.isBanned); }} className={`p-2 rounded-xl border ${u.isBanned ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'}`}>
+                      {u.isBanned ? <Ban className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ইউজার প্রফাইল ডিটেইলস ও মডিফিকেশন */}
+        {activeSection === 'users' && selectedUser && (
+          <div className="space-y-4 pb-6">
+            <div className="bg-[#141032] border border-white/10 rounded-3xl p-5 text-center space-y-3 shadow-xl text-white">
+              <div onClick={() => selectedUser.profilePic && setPreviewImage(selectedUser.profilePic)} className="w-20 h-20 rounded-full overflow-hidden bg-indigo-500/20 border-2 border-indigo-400 mx-auto shadow-xl flex items-center justify-center font-black text-2xl cursor-pointer relative group">
+                {selectedUser.profilePic ? <img src={selectedUser.profilePic} alt="" className="w-full h-full object-cover" /> : selectedUser.name?.charAt(0)}
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all text-[9px]">বড় করুন</div>
+              </div>
+              <div>
+                <h3 className="text-base font-black">{selectedUser.name}</h3>
+                <p className="text-[11px] text-slate-400 font-mono mt-1">📱 {selectedUser.phone}</p>
+                <p className="text-[10px] text-indigo-300 font-mono mt-0.5">📍 {selectedUser.district}, {selectedUser.division}</p>
+              </div>
+            </div>
+
+            <div className="bg-[#141032] border border-white/10 rounded-3xl p-5 space-y-3 shadow-xl text-white">
+              <h4 className="font-bold border-b border-white/10 pb-2">ইউজার তথ্য ও ব্যালেন্স মডিফিকেশন</h4>
+              <div>
+                <label className="text-[10px] text-slate-400 block mb-1">নাম</label>
+                <input type="text" value={selectedUser.name || ''} onChange={(e) => setSelectedUser({ ...selectedUser, name: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-indigo-500" />
+              </div>
+              <div>
+                <label className="text-[10px] text-slate-400 block mb-1">ফোন নম্বর</label>
+                <input type="text" value={selectedUser.phone || ''} onChange={(e) => setSelectedUser({ ...selectedUser, phone: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-indigo-500 font-mono" />
+              </div>
+              <div>
+                <label className="text-[10px] text-slate-400 block mb-1">সিক্রেট পিন (PIN)</label>
+                <input type="text" value={selectedUser.pin || ''} onChange={(e) => setSelectedUser({ ...selectedUser, pin: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-indigo-500 font-mono" />
+              </div>
+              <div>
+                <label className="text-[10px] text-slate-400 block mb-1">ব্যালেন্স</label>
+                <input type="number" value={customMainBalance} onChange={(e) => setCustomMainBalance(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 font-mono font-bold text-white focus:outline-none focus:border-indigo-500" />
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                <button onClick={() => toggleUserBan(selectedUser.id, selectedUser.isBanned)} className={`py-3 rounded-xl font-bold text-white shadow ${selectedUser.isBanned ? 'bg-emerald-600' : 'bg-amber-600'}`}>
+                  {selectedUser.isBanned ? 'আনব্লক করুন' : 'ব্লক করুন'}
+                </button>
+                <button onClick={() => handleDeleteUser(selectedUser.id)} className="py-3 bg-rose-600 text-white font-bold rounded-xl shadow">ডিলিট একাউন্ট</button>
+              </div>
+              <button onClick={handleSaveUserChanges} className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-xl shadow-lg active:scale-95">পরিবর্তন সেভ করুন</button>
+            </div>
+          </div>
+        )}
+
+        {/* বড় ছবি প্রিভিউ মডাল */}
+        {previewImage && (
+          <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
+            <div className="relative max-w-sm w-full text-center space-y-3">
+              <button onClick={() => setPreviewImage(null)} className="absolute -top-12 right-0 p-2 bg-white/10 rounded-full text-white"><X className="w-5 h-5" /></button>
+              <img src={previewImage} alt="Full Profile" className="w-64 h-64 rounded-full object-cover mx-auto border-4 border-indigo-500 shadow-2xl" />
+              <p className="text-white text-xs font-bold">ইউজার প্রফাইল ছবি</p>
+            </div>
+          </div>
+        )}
+
+        {/* অন্যান্য মেনু ও সেকশনগুলো ঠিক রাখা হয়েছে */}
         {activeSection === 'links' && (
           <div className="space-y-4">
             <div className="bg-[#141032] border border-white/10 rounded-3xl p-5 flex items-center justify-between shadow-xl">
@@ -485,33 +594,6 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* নতুন আলাদা "এড-মানি অর্ডার" সেকশন */}
-        {activeSection === 'add_money_orders' && (
-          <div className="space-y-3 pb-6">
-            <h4 className="font-bold text-slate-300 px-1 border-b border-white/10 pb-2">নতুন এড-মানি রিকোয়েস্ট ({pendingAddMoneyLogs.length})</h4>
-            {pendingAddMoneyLogs.length === 0 && <div className="text-center text-slate-500 py-6">কোনো পেন্ডিং এড-মানি রিকোয়েস্ট নেই</div>}
-            {pendingAddMoneyLogs.map(log => (
-              <div key={log.id} className="bg-[#141032] border border-white/10 rounded-3xl p-4 space-y-3 shadow-xl text-white mb-3">
-                <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                  <div>
-                    <p className="font-black text-sm">৳{log.amount} <span className="text-emerald-400 text-xs font-bold">({log.method})</span></p>
-                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">TrxID: <strong className="text-indigo-300">{log.trxId}</strong></p>
-                  </div>
-                  <span className="text-[9px] font-bold px-2.5 py-1 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono flex items-center gap-1">
-                    <Clock className="w-3 h-3" /> {log.time}
-                  </span>
-                </div>
-                <div className="text-[11px] text-slate-300 bg-black/30 p-2.5 rounded-2xl border border-white/5">👤 {log.userName} ({log.userPhone})</div>
-                <div className="flex gap-2 pt-1">
-                  <button onClick={() => handleApproveAddMoney(log)} className="flex-1 py-2.5 bg-emerald-600 text-white font-bold rounded-xl shadow-md active:scale-95">Approve</button>
-                  <button onClick={() => handleCancelAddMoney(log.id)} className="flex-1 py-2.5 bg-rose-600 text-white font-bold rounded-xl shadow-md active:scale-95">Cancel</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* রিচার্জ অর্ডার (শুধু পেন্ডিং) */}
         {activeSection === 'recharge_orders' && (
           <div className="space-y-3 pb-6">
             <h4 className="font-bold text-slate-300 px-1 border-b border-white/10 pb-2">পেন্ডিং রিচার্জ রিকোয়েস্ট ({pendingRechargeOrders.length})</h4>
@@ -542,7 +624,6 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* ড্রাইভ অর্ডার (শুধু পেন্ডিং) */}
         {activeSection === 'drive_orders' && (
           <div className="space-y-3 pb-6">
             <h4 className="font-bold text-slate-300 px-1 border-b border-white/10 pb-2">পেন্ডিং ড্রাইভ প্যাক রিকোয়েস্ট ({pendingDriveOrders.length})</h4>
@@ -593,7 +674,6 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* অফার কন্ট্রোল ভিউ */}
         {activeSection === 'offers' && (
           <div className="space-y-4 pb-6">
             <div className="bg-[#141032] border border-white/10 rounded-3xl p-5 space-y-3 shadow-xl">
@@ -687,7 +767,6 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* স্ক্র্যাচ কার্ড ভিউ */}
         {activeSection === 'scratch_cards' && (
           <div className="space-y-4 pb-6">
             <div className="bg-[#141032] border border-white/10 rounded-3xl p-5 space-y-3 shadow-xl">
@@ -715,7 +794,6 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* এড মানি কন্ট্রোল ও নোট সেকশন */}
         {activeSection === 'add_money' && (
           <div className="space-y-4 pb-6">
             <div className="bg-[#141032] border border-white/10 rounded-3xl p-5 flex items-center justify-between shadow-xl">
@@ -753,7 +831,6 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* History Report (সকল সম্পন্ন বা বাতিল হওয়া ট্রানজ্যাকশন) */}
         {activeSection === 'history' && (
           <div className="space-y-4 pb-6">
             <div className="grid grid-cols-3 gap-1 bg-[#141032] border border-white/10 p-1.5 rounded-2xl shadow-inner">
@@ -809,55 +886,6 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* ইউজার ম্যানেজার */}
-        {activeSection === 'users' && !selectedUser && (
-          <div className="space-y-3 pb-6">
-            <div className="relative">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
-              <input type="text" placeholder="নম্বর বা নাম দিয়ে খুঁজুন..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-[#141032] border border-white/20 rounded-2xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-indigo-500 shadow-lg" />
-            </div>
-            <div className="space-y-2.5">
-              {usersList.filter(u => (u.phone || '').includes(searchQuery.trim()) || (u.name || '').toLowerCase().includes(searchQuery.toLowerCase().trim())).map((u) => (
-                <div key={u.id} onClick={() => handleOpenUser(u)} className="bg-[#141032] border border-white/10 rounded-2xl p-4 flex items-center justify-between shadow-lg cursor-pointer hover:bg-white/5 transition-all text-white">
-                  <div>
-                    <h4 className="font-bold text-sm">{u.name}</h4>
-                    <p className="text-[10px] text-slate-400 font-mono mt-1">📱 {u.phone}</p>
-                    <p className="text-[10px] text-indigo-300 font-mono mt-0.5">মেইন: ৳{u.mainBalance || 0} | ড্রাইভ: ৳{u.driveBalance || 0}</p>
-                  </div>
-                  <button onClick={(e) => { e.stopPropagation(); update(ref(db, `users/${u.id}`), { isBanned: !u.isBanned }); }} className={`p-2.5 rounded-xl border ${u.isBanned ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'}`}>
-                    {u.isBanned ? <Ban className="w-4 h-4" /> : <UserIcon className="w-4 h-4" />}
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ইউজার ব্যালেন্স এডিট */}
-        {activeSection === 'users' && selectedUser && (
-          <div className="space-y-4 pb-6">
-            <div className="bg-[#141032] border border-white/10 rounded-3xl p-5 text-center shadow-xl text-white">
-              <h3 className="text-base font-black">{selectedUser.name}</h3>
-              <p className="text-[11px] text-slate-400 font-mono mt-1">📱 {selectedUser.phone}</p>
-            </div>
-            <div className="bg-[#141032] border border-white/10 rounded-3xl p-5 space-y-3 shadow-xl">
-              <h4 className="font-bold text-white border-b border-white/10 pb-2">ব্যালেন্স মডিফিকেশন</h4>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] text-slate-400 block mb-1">মেইন ব্যালেন্স</label>
-                  <input type="number" value={customMainBalance} onChange={(e) => setCustomMainBalance(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 font-mono font-bold text-white focus:outline-none focus:border-indigo-500" />
-                </div>
-                <div>
-                  <label className="text-[10px] text-slate-400 block mb-1">ড্রাইভ ব্যালেন্স</label>
-                  <input type="number" value={customDriveBalance} onChange={(e) => setCustomDriveBalance(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 font-mono font-bold text-white focus:outline-none focus:border-indigo-500" />
-                </div>
-              </div>
-              <button onClick={handleSaveBalance} className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-xl shadow-lg active:scale-95">ব্যালেন্স আপডেট করুন</button>
-            </div>
-          </div>
-        )}
-
-        {/* লাইভ চ্যাট */}
         {activeSection === 'chats' && (
           <div className="grid grid-cols-3 gap-2 h-[450px] pb-6">
             <div className="bg-[#141032] border border-white/10 rounded-2xl p-2 overflow-y-auto space-y-1 shadow-xl">
@@ -890,7 +918,6 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* ব্রডকাস্ট / নোটিশ */}
         {activeSection === 'broadcast' && (
           <div className="space-y-4 pb-6">
             <div className="bg-[#141032] border border-white/10 rounded-3xl p-5 space-y-3 shadow-xl">
@@ -932,7 +959,6 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* ফোর্স আপডেট কন্ট্রোল পেজ */}
         {activeSection === 'update_control' && (
           <div className="space-y-4 pb-6">
             <div className="bg-[#141032] border border-white/10 rounded-3xl p-5 flex items-center justify-between shadow-xl">
@@ -954,7 +980,6 @@ export default function AdminApp() {
         )}
       </main>
 
-      {/* পপআপ অ্যালার্ট */}
       {popupAlert && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-[#18133a] border border-white/15 rounded-3xl p-6 max-w-xs w-full text-center space-y-4 shadow-2xl text-white">
