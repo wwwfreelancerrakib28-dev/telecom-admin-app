@@ -5,7 +5,7 @@ import { ref, set, push, onValue, update, remove } from 'firebase/database';
 import { 
   ShieldCheck, Wallet, Flame, MessageSquare, Search, Edit3, Trash2, 
   ToggleLeft, ToggleRight, Send, ArrowLeft, History, Lock, LogOut, 
-  Radio, CheckCircle, XCircle, Copy, Check, Ban, Ticket, BellRing, Globe, FileText, Smartphone, Users, Sparkles, Facebook, MessageCircle, User as UserIcon, Clock, Eye, X
+  Radio, CheckCircle, XCircle, Copy, Check, Ban, Ticket, BellRing, Globe, FileText, Smartphone, Users, Sparkles, Facebook, MessageCircle, User as UserIcon, Clock, Eye, X, MapPin
 } from 'lucide-react';
 
 export default function AdminApp() {
@@ -17,7 +17,6 @@ export default function AdminApp() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   const [customMainBalance, setCustomMainBalance] = useState('');
-  const [customDriveBalance, setCustomDriveBalance] = useState('');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const [historyTab, setHistoryTab] = useState<'add_money' | 'recharge' | 'drive'>('add_money');
@@ -150,7 +149,7 @@ export default function AdminApp() {
     onValue(ref(db, 'chats'), (snapshot) => {
       const data = snapshot.val();
       if (data && activeChatUser) {
-        const userMsgs = data[activeChatUser.id] || [];
+        const userMsgs = data[activeChatUser.id] || data[activeChatUser.phone] || [];
         setChatMessages(Object.keys(userMsgs).map(k => ({ id: k, ...userMsgs[k] })));
       } else { setChatMessages([]); }
     });
@@ -210,30 +209,29 @@ export default function AdminApp() {
   };
 
   const toggleSimStatus = (simName: string) => {
-    const updated = { ...simStatus, [simName]: !simStatus[simName] };
+    const updated = { ...simStatus, [simName]: simStatus[simName] === false ? true : false };
     setSimStatus(updated);
     set(ref(db, 'settings/simStatus'), updated);
   };
 
   const handleApproveAddMoney = (log: any) => {
-    const targetUserId = log.userId || '1';
-    const userRef = ref(db, `users/${targetUserId}`);
-    onValue(userRef, (snapshot) => {
-      const userData = snapshot.val();
-      if (userData) {
-        const currentBal = log.balanceType === 'drive' ? (userData.driveBalance || 0) : (userData.mainBalance || 0);
-        const newBal = currentBal + Number(log.amount);
-        if (log.balanceType === 'drive') update(userRef, { driveBalance: newBal });
-        else update(userRef, { mainBalance: newBal });
-      }
-    }, { onlyOnce: true });
+    const targetPhoneNum = log.userPhone;
+    const targetUser = usersList.find(u => u.phone === targetPhoneNum);
+    
+    if (targetUser) {
+      const userRef = ref(db, `users/${targetUser.id}`);
+      const currentBal = Number(targetUser.balance || targetUser.mainBalance || 0);
+      const newBal = currentBal + Number(log.amount);
+      update(userRef, { balance: newBal, mainBalance: newBal });
+    }
 
     update(ref(db, `addMoneyLogs/${log.id}`), { status: 'Approved' });
-    setPopupAlert('✅ এড-মানি অ্যাপ্রুভ করা হয়েছে!');
+    setPopupAlert('✅ এড-মানি অ্যাপ্রুভ ও ব্যালেন্স যোগ করা হয়েছে!');
   };
 
   const handleCancelAddMoney = (id: string) => {
     update(ref(db, `addMoneyLogs/${id}`), { status: 'Cancelled' });
+    setPopupAlert('❌ এড-মানি রিকোয়েস্ট বাতিল করা হয়েছে!');
   };
 
   const handleAddOffer = () => {
@@ -302,13 +300,20 @@ export default function AdminApp() {
 
   const handleSendAdminChat = () => {
     if (!replyText.trim() || !activeChatUser) return;
-    push(ref(db, `chats/${activeChatUser.id}`), { sender: 'admin', text: replyText.trim(), time: new Date().toLocaleTimeString() });
+    const chatKey = activeChatUser.id || activeChatUser.phone;
+    push(ref(db, `chats/${chatKey}`), { sender: 'admin', text: replyText.trim(), time: new Date().toLocaleTimeString() });
     setReplyText('');
   };
 
-  const handleOpenUser = (u: any) => {
-    setSelectedUser(u);
-    setCustomMainBalance((u.balance || u.mainBalance || 0).toString());
+  const handleOpenUserByPhone = (phone: string) => {
+    const found = usersList.find(u => u.phone === phone);
+    if (found) {
+      setSelectedUser(found);
+      setCustomMainBalance((found.balance || found.mainBalance || 0).toString());
+      setActiveSection('users');
+    } else {
+      alert('ইউজার ডাটাবেজে পাওয়া যায়নি!');
+    }
   };
 
   const handleSaveUserChanges = () => {
@@ -398,10 +403,10 @@ export default function AdminApp() {
               <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
               <div className="flex justify-between items-center relative z-10 border-b border-white/10 pb-2">
                 <span className="text-[10px] font-bold text-purple-300 uppercase">📊 SYSTEM METRICS</span>
-                <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1"><span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" /> Live</span>
               </div>
               <div className="grid grid-cols-3 gap-2 relative z-10 text-center">
-                <div className="bg-black/30 border border-white/10 rounded-2xl p-2.5">
+                {/* মোট ইউজার কার্ডে ক্লিক করলে সরাসরি ইউজার লিস্ট ওপেন হবে */}
+                <div onClick={() => setActiveSection('users')} className="bg-black/30 border border-white/10 rounded-2xl p-2.5 cursor-pointer hover:bg-white/5 transition-all">
                   <span className="text-[9px] text-slate-400 block mb-0.5">মোট ইউজার</span>
                   <strong className="text-sm font-black text-white font-mono">{appStats.activeAccounts}</strong>
                 </div>
@@ -455,11 +460,6 @@ export default function AdminApp() {
                 <span className="font-extrabold text-white text-xs">নোট ও পেমেন্ট নম্বর</span>
               </button>
 
-              <button onClick={() => setActiveSection('users')} className="bg-[#141032] border border-white/10 hover:bg-white/5 rounded-3xl p-4 flex flex-col items-center text-center shadow-lg active:scale-95 transition-all">
-                <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mb-2"><Users className="w-5 h-5" /></div>
-                <span className="font-extrabold text-white text-xs">ইউজার ম্যানেজার</span>
-              </button>
-
               <button onClick={() => setActiveSection('chats')} className="bg-[#141032] border border-white/10 hover:bg-white/5 rounded-3xl p-4 flex flex-col items-center text-center shadow-lg active:scale-95 transition-all">
                 <div className="w-10 h-10 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mb-2"><MessageSquare className="w-5 h-5" /></div>
                 <span className="font-extrabold text-white text-xs">লাইভ চ্যাট</span>
@@ -483,9 +483,13 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* ইউজার ম্যানেজার (সার্চ, ব্লক/আনব্লক, ফুল প্রফাইল এডিট ও বড় ছবি ভিউ) */}
+        {/* ইউজার ম্যানেজার (সকল ইউজারের তালিকা ও মোট ইউজার কাউন্ট) */}
         {activeSection === 'users' && !selectedUser && (
           <div className="space-y-3 pb-6">
+            <div className="bg-[#141032] border border-white/10 rounded-2xl p-3 flex justify-between items-center text-white">
+              <span className="font-bold">মোট নিবন্ধিত ইউজার</span>
+              <span className="px-3 py-1 bg-indigo-600 rounded-xl font-mono font-black">{usersList.length} জন</span>
+            </div>
             <div className="relative">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
               <input type="text" placeholder="নম্বর বা নাম দিয়ে খুঁজুন..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-[#141032] border border-white/20 rounded-2xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-indigo-500 shadow-lg" />
@@ -494,7 +498,7 @@ export default function AdminApp() {
               {usersList.filter(u => (u.phone || '').includes(searchQuery.trim()) || (u.name || '').toLowerCase().includes(searchQuery.toLowerCase().trim())).map((u) => (
                 <div key={u.id} onClick={() => handleOpenUser(u)} className="bg-[#141032] border border-white/10 rounded-2xl p-4 flex items-center justify-between shadow-lg cursor-pointer hover:bg-white/5 transition-all text-white">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full overflow-hidden bg-indigo-500/20 border border-white/20 shrink-0 flex items-center justify-center font-bold">
+                    <div onClick={(e) => { e.stopPropagation(); u.profilePic && setPreviewImage(u.profilePic); }} className="w-10 h-10 rounded-full overflow-hidden bg-indigo-500/20 border border-white/20 shrink-0 flex items-center justify-center font-bold">
                       {u.profilePic ? <img src={u.profilePic} alt="" className="w-full h-full object-cover" /> : u.name?.charAt(0)}
                     </div>
                     <div>
@@ -569,7 +573,7 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* অন্যান্য মেনু ও সেকশনগুলো ঠিক রাখা হয়েছে */}
+        {/* সাপোর্ট ও সোশ্যাল লিংক সেটিংস */}
         {activeSection === 'links' && (
           <div className="space-y-4">
             <div className="bg-[#141032] border border-white/10 rounded-3xl p-5 flex items-center justify-between shadow-xl">
@@ -594,70 +598,130 @@ export default function AdminApp() {
           </div>
         )}
 
-        {activeSection === 'recharge_orders' && (
+        {/* নতুন এড-মানি অর্ডার সেকশন */}
+        {activeSection === 'add_money_orders' && (
           <div className="space-y-3 pb-6">
-            <h4 className="font-bold text-slate-300 px-1 border-b border-white/10 pb-2">পেন্ডিং রিচার্জ রিকোয়েস্ট ({pendingRechargeOrders.length})</h4>
-            {pendingRechargeOrders.length === 0 && <div className="text-center text-slate-500 py-6">কোনো পেন্ডিং রিচার্জ অর্ডার নেই</div>}
-            {pendingRechargeOrders.map((ord) => (
-              <div key={ord.id} className="bg-[#141032] border border-white/10 rounded-3xl p-4 space-y-3 shadow-xl text-white mb-3">
+            <h4 className="font-bold text-slate-300 px-1 border-b border-white/10 pb-2">নতুন এড-মানি রিকোয়েস্ট ({pendingAddMoneyLogs.length})</h4>
+            {pendingAddMoneyLogs.length === 0 && <div className="text-center text-slate-500 py-6">কোনো পেন্ডিং এড-মানি রিকোয়েস্ট নেই</div>}
+            {pendingAddMoneyLogs.map(log => (
+              <div key={log.id} className="bg-[#141032] border border-white/10 rounded-3xl p-4 space-y-3 shadow-xl text-white mb-3">
                 <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                  <span className="font-black text-sky-400 text-xs bg-sky-500/10 border border-sky-500/20 px-2.5 py-1 rounded-xl uppercase">{ord.operator} - ৳{ord.amount}</span>
-                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 font-mono flex items-center gap-1">
-                    <Clock className="w-3 h-3" /> {ord.time}
+                  <div>
+                    <p className="font-black text-sm">৳{log.amount} <span className="text-emerald-400 text-xs font-bold">({log.method})</span></p>
+                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">TrxID: <strong className="text-indigo-300">{log.trxId}</strong></p>
+                  </div>
+                  <span className="text-[9px] font-bold px-2.5 py-1 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono flex items-center gap-1">
+                    <Clock className="w-3 h-3" /> {log.time}
                   </span>
                 </div>
-                <div className="bg-black/30 border border-white/10 rounded-2xl p-3 space-y-1.5 text-[11px]">
-                  <p className="text-slate-300">👤 ইউজার: <strong className="text-white">{ord.userName}</strong> ({ord.userPhone})</p>
-                  <div className="flex items-center justify-between pt-1.5 border-t border-white/10">
-                    <span className="text-slate-400">🎯 রিচার্জ নম্বর: <strong className="font-mono text-indigo-300 text-sm">{ord.targetNumber}</strong></span>
-                    <button onClick={() => handleCopy(ord.targetNumber, ord.id)} className="px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-[10px] font-bold flex items-center gap-1 active:scale-95 shadow">
-                      {copiedId === ord.id ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />} কপি
-                    </button>
-                  </div>
-                </div>
+                <div className="text-[11px] text-slate-300 bg-black/30 p-2.5 rounded-2xl border border-white/5">👤 {log.userName} ({log.userPhone})</div>
                 <div className="flex gap-2 pt-1">
-                  <button onClick={() => completeRechargeOrder(ord.id)} className="flex-1 py-2.5 bg-emerald-600 text-white font-bold rounded-xl flex items-center justify-center gap-1 shadow-md active:scale-95"><CheckCircle className="w-4 h-4" /> Complete</button>
-                  <button onClick={() => setCancellingOrder({ ...ord, type: 'recharge' })} className="flex-1 py-2.5 bg-rose-600 text-white font-bold rounded-xl flex items-center justify-center gap-1 shadow-md active:scale-95"><XCircle className="w-4 h-4" /> Cancel</button>
+                  <button onClick={() => handleApproveAddMoney(log)} className="flex-1 py-2.5 bg-emerald-600 text-white font-bold rounded-xl shadow-md active:scale-95">Approve</button>
+                  <button onClick={() => handleCancelAddMoney(log.id)} className="flex-1 py-2.5 bg-rose-600 text-white font-bold rounded-xl shadow-md active:scale-95">Cancel</button>
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        {activeSection === 'drive_orders' && (
+        {/* রিচার্জ অর্ডার (ইউজার প্রফাইল ছবি, নম্বর ও ব্যালেন্স সহ ক্লিক করলে প্রোফাইলে প্রবেশ) */}
+        {activeSection === 'recharge_orders' && (
           <div className="space-y-3 pb-6">
-            <h4 className="font-bold text-slate-300 px-1 border-b border-white/10 pb-2">পেন্ডিং ড্রাইভ প্যাক রিকোয়েস্ট ({pendingDriveOrders.length})</h4>
-            {pendingDriveOrders.length === 0 && <div className="text-center text-slate-500 py-6">কোনো পেন্ডিং ড্রাইভ অর্ডার নেই</div>}
-            {pendingDriveOrders.map((ord) => (
-              <div key={ord.id} className="bg-[#141032] border border-white/10 rounded-3xl p-4 space-y-3 shadow-xl text-white mb-3">
-                <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                  <span className="font-black text-amber-400 text-xs bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-xl uppercase">{ord.operator} - ৳{ord.price}</span>
-                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 font-mono flex items-center gap-1">
-                    <Clock className="w-3 h-3" /> {ord.time}
-                  </span>
-                </div>
-                <div className="bg-black/30 border border-white/10 rounded-2xl p-3 space-y-2 text-[11px]">
-                  <p className="text-slate-300">📦 প্যাকেজ: <strong className="text-white">{ord.packageTitle}</strong></p>
-                  <p className="text-slate-400">👤 ইউজার: <strong className="text-white">{ord.userName}</strong> ({ord.userPhone})</p>
-                  <div className="flex items-center justify-between pt-1.5 border-t border-white/10">
-                    <span className="text-slate-400">🎯 টার্গেট নম্বর: <strong className="font-mono text-indigo-300 text-sm">{ord.targetNumber}</strong></span>
+            <h4 className="font-bold text-slate-300 px-1 border-b border-white/10 pb-2">পেন্ডিং রিচার্জ রিকোয়েস্ট ({pendingRechargeOrders.length})</h4>
+            {pendingRechargeOrders.length === 0 && <div className="text-center text-slate-500 py-6">কোনো পেন্ডিং রিচার্জ অর্ডার নেই</div>}
+            {pendingRechargeOrders.map((ord) => {
+              const matchedUser = usersList.find(u => u.phone === ord.userPhone);
+              return (
+                <div key={ord.id} className="bg-[#141032] border border-white/10 rounded-3xl p-4 space-y-3 shadow-xl text-white mb-3">
+                  <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                    <span className="font-black text-sky-400 text-xs bg-sky-500/10 border border-sky-500/20 px-2.5 py-1 rounded-xl uppercase">{ord.operator} - ৳{ord.amount}</span>
+                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 font-mono flex items-center gap-1">
+                      <Clock className="w-3 h-3" /> {ord.time}
+                    </span>
+                  </div>
+                  
+                  {/* ইউজার প্রফাইল ইনফো (ক্লিক করলে প্রোফাইলে যাবে) */}
+                  <div onClick={() => matchedUser && handleOpenUser(matchedUser)} className="bg-black/30 border border-white/10 rounded-2xl p-3 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-all">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-full overflow-hidden bg-indigo-500/20 border border-white/20 shrink-0 flex items-center justify-center font-bold">
+                        {matchedUser?.profilePic ? <img src={matchedUser.profilePic} alt="" className="w-full h-full object-cover" /> : ord.userName?.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="font-bold text-xs text-white">{ord.userName}</p>
+                        <p className="text-[10px] text-slate-400 font-mono">📱 {ord.userPhone} | ব্যালেন্স: ৳{matchedUser?.balance || matchedUser?.mainBalance || 0}</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-indigo-400 font-bold underline">প্রোফাইল দেখুন</span>
+                  </div>
+
+                  <div className="bg-black/30 border border-white/10 rounded-2xl p-3 flex items-center justify-between text-[11px]">
+                    <span className="text-slate-400">🎯 রিচার্জ নম্বর: <strong className="font-mono text-indigo-300 text-sm">{ord.targetNumber}</strong></span>
                     <button onClick={() => handleCopy(ord.targetNumber, ord.id)} className="px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-[10px] font-bold flex items-center gap-1 active:scale-95 shadow">
                       {copiedId === ord.id ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />} কপি
                     </button>
                   </div>
-                  <div className="flex items-center justify-between pt-2 border-t border-white/10 bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-xl">
-                    <span className="font-bold text-amber-300">⚠️ এই নাম্বারে কি লোন আছে?</span>
-                    <button onClick={() => toggleDriveLoanStatus(ord.id, ord.hasLoan)} className={`px-3 py-1.5 rounded-xl text-[10px] font-bold shadow-md ${ord.hasLoan ? 'bg-rose-600 text-white' : 'bg-emerald-600 text-white'}`}>
-                      {ord.hasLoan ? 'হ্যাঁ (Loan আছে)' : 'না (Loan নাই)'}
-                    </button>
+
+                  <div className="flex gap-2 pt-1">
+                    <button onClick={() => completeRechargeOrder(ord.id)} className="flex-1 py-2.5 bg-emerald-600 text-white font-bold rounded-xl flex items-center justify-center gap-1 shadow-md active:scale-95"><CheckCircle className="w-4 h-4" /> Complete</button>
+                    <button onClick={() => setCancellingOrder({ ...ord, type: 'recharge' })} className="flex-1 py-2.5 bg-rose-600 text-white font-bold rounded-xl flex items-center justify-center gap-1 shadow-md active:scale-95"><XCircle className="w-4 h-4" /> Cancel</button>
                   </div>
                 </div>
-                <div className="flex gap-2 pt-1">
-                  <button onClick={() => handleCompleteDrive(ord)} className="flex-1 py-2.5 bg-emerald-600 text-white font-bold rounded-xl flex items-center justify-center gap-1 shadow-md active:scale-95"><CheckCircle className="w-4 h-4" /> Complete</button>
-                  <button onClick={() => setCancellingOrder({ ...ord, type: 'drive' })} className="flex-1 py-2.5 bg-rose-600 text-white font-bold rounded-xl flex items-center justify-center gap-1 shadow-md active:scale-95"><XCircle className="w-4 h-4" /> Cancel</button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ড্রাইভ অর্ডার (ইউজার প্রফাইল ছবি, নম্বর ও ব্যালেন্স সহ) */}
+        {activeSection === 'drive_orders' && (
+          <div className="space-y-3 pb-6">
+            <h4 className="font-bold text-slate-300 px-1 border-b border-white/10 pb-2">পেন্ডিং ড্রাইভ প্যাক রিকোয়েস্ট ({pendingDriveOrders.length})</h4>
+            {pendingDriveOrders.length === 0 && <div className="text-center text-slate-500 py-6">কোনো পেন্ডিং ড্রাইভ অর্ডার নেই</div>}
+            {pendingDriveOrders.map((ord) => {
+              const matchedUser = usersList.find(u => u.phone === ord.userPhone);
+              return (
+                <div key={ord.id} className="bg-[#141032] border border-white/10 rounded-3xl p-4 space-y-3 shadow-xl text-white mb-3">
+                  <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                    <span className="font-black text-amber-400 text-xs bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-xl uppercase">{ord.operator} - ৳{ord.price}</span>
+                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 font-mono flex items-center gap-1">
+                      <Clock className="w-3 h-3" /> {ord.time}
+                    </span>
+                  </div>
+
+                  <div onClick={() => matchedUser && handleOpenUser(matchedUser)} className="bg-black/30 border border-white/10 rounded-2xl p-3 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-all">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-full overflow-hidden bg-indigo-500/20 border border-white/20 shrink-0 flex items-center justify-center font-bold">
+                        {matchedUser?.profilePic ? <img src={matchedUser.profilePic} alt="" className="w-full h-full object-cover" /> : ord.userName?.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="font-bold text-xs text-white">{ord.userName}</p>
+                        <p className="text-[10px] text-slate-400 font-mono">📱 {ord.userPhone} | ব্যালেন্স: ৳{matchedUser?.balance || matchedUser?.mainBalance || 0}</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-indigo-400 font-bold underline">প্রোফাইল দেখুন</span>
+                  </div>
+
+                  <div className="bg-black/30 border border-white/10 rounded-2xl p-3 space-y-2 text-[11px]">
+                    <p className="text-slate-300">📦 প্যাকেজ: <strong className="text-white">{ord.packageTitle}</strong></p>
+                    <div className="flex items-center justify-between pt-1.5 border-t border-white/10">
+                      <span className="text-slate-400">🎯 টার্গেট নম্বর: <strong className="font-mono text-indigo-300 text-sm">{ord.targetNumber}</strong></span>
+                      <button onClick={() => handleCopy(ord.targetNumber, ord.id)} className="px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-[10px] font-bold flex items-center gap-1 active:scale-95 shadow">
+                        {copiedId === ord.id ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />} কপি
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between pt-2 border-t border-white/10 bg-amber-500/10 border border-amber-500/20 p-2.5 rounded-xl">
+                      <span className="font-bold text-amber-300">⚠️ এই নাম্বারে কি লোন আছে?</span>
+                      <button onClick={() => toggleDriveLoanStatus(ord.id, ord.hasLoan)} className={`px-3 py-1.5 rounded-xl text-[10px] font-bold shadow-md ${ord.hasLoan ? 'bg-rose-600 text-white' : 'bg-emerald-600 text-white'}`}>
+                        {ord.hasLoan ? 'হ্যাঁ (Loan আছে)' : 'না (Loan নাই)'}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <button onClick={() => handleCompleteDrive(ord)} className="flex-1 py-2.5 bg-emerald-600 text-white font-bold rounded-xl flex items-center justify-center gap-1 shadow-md active:scale-95"><CheckCircle className="w-4 h-4" /> Complete</button>
+                    <button onClick={() => setCancellingOrder({ ...ord, type: 'drive' })} className="flex-1 py-2.5 bg-rose-600 text-white font-bold rounded-xl flex items-center justify-center gap-1 shadow-md active:scale-95"><XCircle className="w-4 h-4" /> Cancel</button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -886,21 +950,46 @@ export default function AdminApp() {
           </div>
         )}
 
+        {/* প্রিমিয়াম লাইভ চ্যাট থিম (ইউজার ছবি, নম্বর ও ব্যালেন্স সহ) */}
         {activeSection === 'chats' && (
           <div className="grid grid-cols-3 gap-2 h-[450px] pb-6">
             <div className="bg-[#141032] border border-white/10 rounded-2xl p-2 overflow-y-auto space-y-1 shadow-xl">
               <h5 className="font-bold text-[10px] text-slate-400 p-2 text-center uppercase tracking-widest border-b border-white/5 mb-2">ইনবক্স</h5>
               {chatUsers.map(u => (
                 <div key={u.id} onClick={() => setActiveChatUser(u)} className={`p-2.5 rounded-xl cursor-pointer transition-all ${activeChatUser?.id === u.id ? 'bg-indigo-600 shadow-md text-white' : 'bg-white/5 text-slate-300 hover:bg-white/10'}`}>
-                  <p className="font-bold text-[11px] truncate">{u.name}</p>
-                  <p className="text-[9px] font-mono opacity-70 mt-0.5">{u.phone}</p>
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full overflow-hidden bg-indigo-500/20 shrink-0 flex items-center justify-center font-bold text-[10px]">
+                      {u.profilePic ? <img src={u.profilePic} alt="" className="w-full h-full object-cover" /> : u.name?.charAt(0)}
+                    </div>
+                    <div className="truncate">
+                      <p className="font-bold text-[11px] truncate">{u.name}</p>
+                      <p className="text-[9px] font-mono opacity-70">{u.phone}</p>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
+
             <div className="col-span-2 bg-[#141032] border border-white/10 rounded-2xl p-3 flex flex-col justify-between shadow-xl text-white">
-              <div className="border-b border-white/10 pb-2">
-                <h4 className="font-bold text-xs">{activeChatUser ? activeChatUser.name : 'চ্যাট সিলেক্ট করুন'}</h4>
+              <div className="border-b border-white/10 pb-2 flex items-center justify-between">
+                {activeChatUser ? (
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full overflow-hidden bg-indigo-500/20 border border-white/20 shrink-0 flex items-center justify-center font-bold text-xs">
+                      {activeChatUser.profilePic ? <img src={activeChatUser.profilePic} alt="" className="w-full h-full object-cover" /> : activeChatUser.name?.charAt(0)}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-xs">{activeChatUser.name}</h4>
+                      <p className="text-[9px] text-indigo-300 font-mono">📱 {activeChatUser.phone} | ব্যালেন্স: ৳{activeChatUser.balance || activeChatUser.mainBalance || 0}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <h4 className="font-bold text-xs">চ্যাট সিলেক্ট করুন</h4>
+                )}
+                {activeChatUser && (
+                  <button onClick={() => handleOpenUserByPhone(activeChatUser.phone)} className="text-[9px] bg-indigo-600 px-2 py-1 rounded-lg text-white font-bold">প্রোফাইল দেখুন</button>
+                )}
               </div>
+
               <div className="flex-1 overflow-y-auto space-y-2 py-2 pr-1">
                 {chatMessages.map((msg, i) => (
                   <div key={i} className={`flex ${msg.sender === 'admin' ? 'justify-end' : 'justify-start'}`}>
@@ -910,8 +999,9 @@ export default function AdminApp() {
                   </div>
                 ))}
               </div>
+
               <div className="flex gap-1.5 pt-2 border-t border-white/10">
-                <input type="text" placeholder="মেসেজ লিখুন..." value={replyText} onChange={(e) => setReplyText(e.target.value)} className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500" />
+                <input type="text" placeholder="মেসেজ লিখুন..." value={replyText} onChange={(e) => setReplyText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSendAdminChat()} className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500" />
                 <button onClick={handleSendAdminChat} className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-md active:scale-95"><Send className="w-4 h-4" /></button>
               </div>
             </div>
