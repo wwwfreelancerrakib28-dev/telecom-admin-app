@@ -5,7 +5,7 @@ import { ref, set, push, onValue, update, remove } from 'firebase/database';
 import { 
   ShieldCheck, Wallet, Flame, MessageSquare, Search, Edit3, Trash2, 
   ToggleLeft, ToggleRight, Send, ArrowLeft, History, Lock, LogOut, 
-  Radio, CheckCircle, XCircle, Copy, Check, Ban, Ticket, BellRing, Globe, FileText, Smartphone, Users, Sparkles, Facebook, MessageCircle, User as UserIcon
+  Radio, CheckCircle, XCircle, Copy, Check, Ban, Ticket, BellRing, Globe, FileText, Smartphone, Users, Sparkles, Facebook, MessageCircle, User as UserIcon, Clock
 } from 'lucide-react';
 
 export default function AdminApp() {
@@ -13,7 +13,7 @@ export default function AdminApp() {
   const [adminPin, setAdminPin] = useState('');
   const [authError, setAuthError] = useState('');
 
-  const [activeSection, setActiveSection] = useState<'menu' | 'users' | 'add_money' | 'recharge_orders' | 'drive_orders' | 'offers' | 'history' | 'chats' | 'broadcast' | 'scratch_cards' | 'update_control' | 'links'>('menu');
+  const [activeSection, setActiveSection] = useState<'menu' | 'users' | 'add_money' | 'add_money_orders' | 'recharge_orders' | 'drive_orders' | 'offers' | 'history' | 'chats' | 'broadcast' | 'scratch_cards' | 'update_control' | 'links'>('menu');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   const [customMainBalance, setCustomMainBalance] = useState('');
@@ -77,7 +77,7 @@ export default function AdminApp() {
 
     onValue(ref(db, 'offers'), (snapshot) => {
       const data = snapshot.val();
-      if (data) setOffers(Object.keys(data).map(key => ({ id: key, ...data[key] })));
+      if (data) setOffers(Object.keys(data).map(key => ({ id: key, ...data[key] })).reverse());
       else setOffers([]);
     });
 
@@ -124,25 +124,25 @@ export default function AdminApp() {
 
     onValue(ref(db, 'addMoneyLogs'), (snapshot) => {
       const data = snapshot.val();
-      if (data) setAddMoneyLogs(Object.keys(data).map(key => ({ id: key, ...data[key] })));
+      if (data) setAddMoneyLogs(Object.keys(data).map(key => ({ id: key, ...data[key] })).reverse());
       else setAddMoneyLogs([]);
     });
 
     onValue(ref(db, 'rechargeOrders'), (snapshot) => {
       const data = snapshot.val();
-      if (data) setRechargeOrders(Object.keys(data).map(key => ({ id: key, ...data[key] })));
+      if (data) setRechargeOrders(Object.keys(data).map(key => ({ id: key, ...data[key] })).reverse());
       else setRechargeOrders([]);
     });
 
     onValue(ref(db, 'driveOrders'), (snapshot) => {
       const data = snapshot.val();
-      if (data) setDriveOrders(Object.keys(data).map(key => ({ id: key, ...data[key] })));
+      if (data) setDriveOrders(Object.keys(data).map(key => ({ id: key, ...data[key] })).reverse());
       else setDriveOrders([]);
     });
 
     onValue(ref(db, 'scratchCards'), (snapshot) => {
       const data = snapshot.val();
-      if (data) setScratchCardsList(Object.keys(data).map(key => ({ id: key, ...data[key] })));
+      if (data) setScratchCardsList(Object.keys(data).map(key => ({ id: key, ...data[key] })).reverse());
       else setScratchCardsList([]);
     });
 
@@ -155,7 +155,6 @@ export default function AdminApp() {
     });
   }, [activeChatUser]);
 
-  // ফিজিক্যাল ব্যাক বাটন হ্যান্ডলার
   useEffect(() => {
     const backListener = CapacitorApp.addListener('backButton', () => {
       if (cancellingOrder || selectedUser || activeSection !== 'menu') {
@@ -325,9 +324,9 @@ export default function AdminApp() {
     totalBalance: usersList.reduce((acc, u) => acc + (Number(u.mainBalance) || 0) + (Number(u.driveBalance) || 0), 18500)
   };
 
-  const pendingRechargeCount = rechargeOrders.filter(o => o.status === 'Pending').length;
-  const pendingDriveCount = driveOrders.filter(o => o.status === 'Pending').length;
-  const pendingAddMoneyCount = addMoneyLogs.filter(o => o.status === 'Pending').length;
+  const pendingRechargeOrders = rechargeOrders.filter(o => o.status === 'Pending');
+  const pendingDriveOrders = driveOrders.filter(o => o.status === 'Pending');
+  const pendingAddMoneyLogs = addMoneyLogs.filter(o => o.status === 'Pending');
 
   if (!isAuthenticated) {
     return (
@@ -396,15 +395,21 @@ export default function AdminApp() {
 
             <div className="grid grid-cols-2 gap-3">
               <button onClick={() => setActiveSection('recharge_orders')} className="bg-[#141032] border border-white/10 hover:bg-white/5 rounded-3xl p-4 flex flex-col items-center text-center shadow-lg active:scale-95 transition-all relative">
-                {pendingRechargeCount > 0 && <span className="absolute top-3 right-3 w-5 h-5 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-bounce">{pendingRechargeCount}</span>}
+                {pendingRechargeOrders.length > 0 && <span className="absolute top-3 right-3 w-5 h-5 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-bounce">{pendingRechargeOrders.length}</span>}
                 <div className="w-10 h-10 rounded-2xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center mb-2"><Send className="w-5 h-5" /></div>
                 <span className="font-extrabold text-white text-xs">রিচার্জ অর্ডার</span>
               </button>
 
               <button onClick={() => setActiveSection('drive_orders')} className="bg-[#141032] border border-white/10 hover:bg-white/5 rounded-3xl p-4 flex flex-col items-center text-center shadow-lg active:scale-95 transition-all relative">
-                {pendingDriveCount > 0 && <span className="absolute top-3 right-3 w-5 h-5 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-bounce">{pendingDriveCount}</span>}
+                {pendingDriveOrders.length > 0 && <span className="absolute top-3 right-3 w-5 h-5 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-bounce">{pendingDriveOrders.length}</span>}
                 <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mb-2"><Flame className="w-5 h-5" /></div>
                 <span className="font-extrabold text-white text-xs">ড্রাইভ অর্ডার</span>
+              </button>
+
+              <button onClick={() => setActiveSection('add_money_orders')} className="bg-[#141032] border border-white/10 hover:bg-white/5 rounded-3xl p-4 flex flex-col items-center text-center shadow-lg active:scale-95 transition-all relative">
+                {pendingAddMoneyLogs.length > 0 && <span className="absolute top-3 right-3 w-5 h-5 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-bounce">{pendingAddMoneyLogs.length}</span>}
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mb-2"><Wallet className="w-5 h-5" /></div>
+                <span className="font-extrabold text-white text-xs">এড-মানি অর্ডার</span>
               </button>
 
               <button onClick={() => setActiveSection('offers')} className="bg-[#141032] border border-white/10 hover:bg-white/5 rounded-3xl p-4 flex flex-col items-center text-center shadow-lg active:scale-95 transition-all">
@@ -417,15 +422,14 @@ export default function AdminApp() {
                 <span className="font-extrabold text-white text-xs">স্ক্র্যাচ কার্ড</span>
               </button>
 
-              <button onClick={() => setActiveSection('add_money')} className="bg-[#141032] border border-white/10 hover:bg-white/5 rounded-3xl p-4 flex flex-col items-center text-center shadow-lg active:scale-95 transition-all">
-                <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mb-2"><Wallet className="w-5 h-5" /></div>
-                <span className="font-extrabold text-white text-xs">এড মানি ও নোট</span>
-              </button>
-
-              <button onClick={() => setActiveSection('history')} className="bg-[#141032] border border-white/10 hover:bg-white/5 rounded-3xl p-4 flex flex-col items-center text-center shadow-lg active:scale-95 transition-all relative">
-                {pendingAddMoneyCount > 0 && <span className="absolute top-3 right-3 w-5 h-5 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-bounce">{pendingAddMoneyCount}</span>}
+              <button onClick={() => setActiveSection('history')} className="bg-[#141032] border border-white/10 hover:bg-white/5 rounded-3xl p-4 flex flex-col items-center text-center shadow-lg active:scale-95 transition-all">
                 <div className="w-10 h-10 rounded-2xl bg-violet-500/10 border border-violet-500/20 text-violet-400 flex items-center justify-center mb-2"><History className="w-5 h-5" /></div>
                 <span className="font-extrabold text-white text-xs">History রিপোর্ট</span>
+              </button>
+
+              <button onClick={() => setActiveSection('add_money')} className="bg-[#141032] border border-white/10 hover:bg-white/5 rounded-3xl p-4 flex flex-col items-center text-center shadow-lg active:scale-95 transition-all">
+                <div className="w-10 h-10 rounded-2xl bg-teal-500/10 border border-teal-500/20 text-teal-400 flex items-center justify-center mb-2"><FileText className="w-5 h-5" /></div>
+                <span className="font-extrabold text-white text-xs">নোট ও পেমেন্ট নম্বর</span>
               </button>
 
               <button onClick={() => setActiveSection('users')} className="bg-[#141032] border border-white/10 hover:bg-white/5 rounded-3xl p-4 flex flex-col items-center text-center shadow-lg active:scale-95 transition-all">
@@ -481,15 +485,44 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* রিচার্জ অর্ডার ভিউ */}
+        {/* নতুন আলাদা "এড-মানি অর্ডার" সেকশন */}
+        {activeSection === 'add_money_orders' && (
+          <div className="space-y-3 pb-6">
+            <h4 className="font-bold text-slate-300 px-1 border-b border-white/10 pb-2">নতুন এড-মানি রিকোয়েস্ট ({pendingAddMoneyLogs.length})</h4>
+            {pendingAddMoneyLogs.length === 0 && <div className="text-center text-slate-500 py-6">কোনো পেন্ডিং এড-মানি রিকোয়েস্ট নেই</div>}
+            {pendingAddMoneyLogs.map(log => (
+              <div key={log.id} className="bg-[#141032] border border-white/10 rounded-3xl p-4 space-y-3 shadow-xl text-white mb-3">
+                <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                  <div>
+                    <p className="font-black text-sm">৳{log.amount} <span className="text-emerald-400 text-xs font-bold">({log.method})</span></p>
+                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">TrxID: <strong className="text-indigo-300">{log.trxId}</strong></p>
+                  </div>
+                  <span className="text-[9px] font-bold px-2.5 py-1 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono flex items-center gap-1">
+                    <Clock className="w-3 h-3" /> {log.time}
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-300 bg-black/30 p-2.5 rounded-2xl border border-white/5">👤 {log.userName} ({log.userPhone})</div>
+                <div className="flex gap-2 pt-1">
+                  <button onClick={() => handleApproveAddMoney(log)} className="flex-1 py-2.5 bg-emerald-600 text-white font-bold rounded-xl shadow-md active:scale-95">Approve</button>
+                  <button onClick={() => handleCancelAddMoney(log.id)} className="flex-1 py-2.5 bg-rose-600 text-white font-bold rounded-xl shadow-md active:scale-95">Cancel</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* রিচার্জ অর্ডার (শুধু পেন্ডিং) */}
         {activeSection === 'recharge_orders' && (
           <div className="space-y-3 pb-6">
-            <h4 className="font-bold text-slate-300 px-1 border-b border-white/10 pb-2">রিচার্জ অর্ডার রিকোয়েস্ট ({rechargeOrders.length})</h4>
-            {rechargeOrders.map((ord) => (
+            <h4 className="font-bold text-slate-300 px-1 border-b border-white/10 pb-2">পেন্ডিং রিচার্জ রিকোয়েস্ট ({pendingRechargeOrders.length})</h4>
+            {pendingRechargeOrders.length === 0 && <div className="text-center text-slate-500 py-6">কোনো পেন্ডিং রিচার্জ অর্ডার নেই</div>}
+            {pendingRechargeOrders.map((ord) => (
               <div key={ord.id} className="bg-[#141032] border border-white/10 rounded-3xl p-4 space-y-3 shadow-xl text-white mb-3">
                 <div className="flex justify-between items-center border-b border-white/10 pb-2">
                   <span className="font-black text-sky-400 text-xs bg-sky-500/10 border border-sky-500/20 px-2.5 py-1 rounded-xl uppercase">{ord.operator} - ৳{ord.amount}</span>
-                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-lg ${ord.status === 'Completed' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : ord.status === 'Cancelled' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'}`}>{ord.status}</span>
+                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 font-mono flex items-center gap-1">
+                    <Clock className="w-3 h-3" /> {ord.time}
+                  </span>
                 </div>
                 <div className="bg-black/30 border border-white/10 rounded-2xl p-3 space-y-1.5 text-[11px]">
                   <p className="text-slate-300">👤 ইউজার: <strong className="text-white">{ord.userName}</strong> ({ord.userPhone})</p>
@@ -500,26 +533,27 @@ export default function AdminApp() {
                     </button>
                   </div>
                 </div>
-                {ord.status === 'Pending' && (
-                  <div className="flex gap-2 pt-1">
-                    <button onClick={() => completeRechargeOrder(ord.id)} className="flex-1 py-2.5 bg-emerald-600 text-white font-bold rounded-xl flex items-center justify-center gap-1 shadow-md active:scale-95"><CheckCircle className="w-4 h-4" /> Complete</button>
-                    <button onClick={() => setCancellingOrder({ ...ord, type: 'recharge' })} className="flex-1 py-2.5 bg-rose-600 text-white font-bold rounded-xl flex items-center justify-center gap-1 shadow-md active:scale-95"><XCircle className="w-4 h-4" /> Cancel</button>
-                  </div>
-                )}
+                <div className="flex gap-2 pt-1">
+                  <button onClick={() => completeRechargeOrder(ord.id)} className="flex-1 py-2.5 bg-emerald-600 text-white font-bold rounded-xl flex items-center justify-center gap-1 shadow-md active:scale-95"><CheckCircle className="w-4 h-4" /> Complete</button>
+                  <button onClick={() => setCancellingOrder({ ...ord, type: 'recharge' })} className="flex-1 py-2.5 bg-rose-600 text-white font-bold rounded-xl flex items-center justify-center gap-1 shadow-md active:scale-95"><XCircle className="w-4 h-4" /> Cancel</button>
+                </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* ড্রাইভ অর্ডার ভিউ */}
+        {/* ড্রাইভ অর্ডার (শুধু পেন্ডিং) */}
         {activeSection === 'drive_orders' && (
           <div className="space-y-3 pb-6">
-            <h4 className="font-bold text-slate-300 px-1 border-b border-white/10 pb-2">ড্রাইভ প্যাক রিকোয়েস্ট ({driveOrders.length})</h4>
-            {driveOrders.map((ord) => (
+            <h4 className="font-bold text-slate-300 px-1 border-b border-white/10 pb-2">পেন্ডিং ড্রাইভ প্যাক রিকোয়েস্ট ({pendingDriveOrders.length})</h4>
+            {pendingDriveOrders.length === 0 && <div className="text-center text-slate-500 py-6">কোনো পেন্ডিং ড্রাইভ অর্ডার নেই</div>}
+            {pendingDriveOrders.map((ord) => (
               <div key={ord.id} className="bg-[#141032] border border-white/10 rounded-3xl p-4 space-y-3 shadow-xl text-white mb-3">
                 <div className="flex justify-between items-center border-b border-white/10 pb-2">
                   <span className="font-black text-amber-400 text-xs bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-xl uppercase">{ord.operator} - ৳{ord.price}</span>
-                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-lg ${ord.status === 'Completed' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : ord.status === 'Cancelled' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'}`}>{ord.status}</span>
+                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 font-mono flex items-center gap-1">
+                    <Clock className="w-3 h-3" /> {ord.time}
+                  </span>
                 </div>
                 <div className="bg-black/30 border border-white/10 rounded-2xl p-3 space-y-2 text-[11px]">
                   <p className="text-slate-300">📦 প্যাকেজ: <strong className="text-white">{ord.packageTitle}</strong></p>
@@ -537,12 +571,10 @@ export default function AdminApp() {
                     </button>
                   </div>
                 </div>
-                {ord.status === 'Pending' && (
-                  <div className="flex gap-2 pt-1">
-                    <button onClick={() => handleCompleteDrive(ord)} className="flex-1 py-2.5 bg-emerald-600 text-white font-bold rounded-xl flex items-center justify-center gap-1 shadow-md active:scale-95"><CheckCircle className="w-4 h-4" /> Complete</button>
-                    <button onClick={() => setCancellingOrder({ ...ord, type: 'drive' })} className="flex-1 py-2.5 bg-rose-600 text-white font-bold rounded-xl flex items-center justify-center gap-1 shadow-md active:scale-95"><XCircle className="w-4 h-4" /> Cancel</button>
-                  </div>
-                )}
+                <div className="flex gap-2 pt-1">
+                  <button onClick={() => handleCompleteDrive(ord)} className="flex-1 py-2.5 bg-emerald-600 text-white font-bold rounded-xl flex items-center justify-center gap-1 shadow-md active:scale-95"><CheckCircle className="w-4 h-4" /> Complete</button>
+                  <button onClick={() => setCancellingOrder({ ...ord, type: 'drive' })} className="flex-1 py-2.5 bg-rose-600 text-white font-bold rounded-xl flex items-center justify-center gap-1 shadow-md active:scale-95"><XCircle className="w-4 h-4" /> Cancel</button>
+                </div>
               </div>
             ))}
           </div>
@@ -721,7 +753,7 @@ export default function AdminApp() {
           </div>
         )}
 
-        {/* History Report */}
+        {/* History Report (সকল সম্পন্ন বা বাতিল হওয়া ট্রানজ্যাকশন) */}
         {activeSection === 'history' && (
           <div className="space-y-4 pb-6">
             <div className="grid grid-cols-3 gap-1 bg-[#141032] border border-white/10 p-1.5 rounded-2xl shadow-inner">
@@ -732,51 +764,44 @@ export default function AdminApp() {
 
             {historyTab === 'add_money' && (
               <div className="space-y-3">
-                <h4 className="font-bold text-slate-300 px-1 border-b border-white/10 pb-2">এড-মানি রিকোয়েস্ট লিস্ট ({addMoneyLogs.length})</h4>
-                {addMoneyLogs.map(log => (
-                  <div key={log.id} className="bg-[#141032] border border-white/10 rounded-3xl p-4 space-y-3 shadow-xl text-white">
-                    <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                      <div>
-                        <p className="font-black text-sm">৳{log.amount} <span className="text-emerald-400 text-xs font-bold">({log.method})</span></p>
-                        <p className="text-[10px] text-slate-400 font-mono mt-0.5">TrxID: <strong className="text-indigo-300">{log.trxId}</strong></p>
-                      </div>
-                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-xl border ${log.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : log.status === 'Cancelled' ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' : 'bg-amber-500/10 text-amber-400 border-amber-500/30'}`}>{log.status}</span>
+                <h4 className="font-bold text-slate-300 px-1 border-b border-white/10 pb-2">এড-মানি হিস্ট্রি ({addMoneyLogs.filter(l => l.status !== 'Pending').length})</h4>
+                {addMoneyLogs.filter(l => l.status !== 'Pending').map(log => (
+                  <div key={log.id} className="bg-[#141032] border border-white/10 rounded-3xl p-4 flex justify-between items-center shadow-lg text-white">
+                    <div>
+                      <p className="font-bold text-sm">৳{log.amount} <span className="text-emerald-400 text-[10px]">({log.method})</span></p>
+                      <p className="text-[10px] text-slate-400 mt-1 font-mono">TrxID: {log.trxId} | {log.time}</p>
                     </div>
-                    <div className="text-[11px] text-slate-300 bg-black/30 p-2.5 rounded-2xl border border-white/5">👤 {log.userName} ({log.userPhone})</div>
-                    {log.status === 'Pending' && (
-                      <div className="flex gap-2 pt-1">
-                        <button onClick={() => handleApproveAddMoney(log)} className="flex-1 py-2.5 bg-emerald-600 text-white font-bold rounded-xl shadow-md active:scale-95">Approve</button>
-                        <button onClick={() => handleCancelAddMoney(log.id)} className="flex-1 py-2.5 bg-rose-600 text-white font-bold rounded-xl shadow-md active:scale-95">Cancel</button>
-                      </div>
-                    )}
+                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-xl border ${log.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-rose-500/10 text-rose-400 border-rose-500/30'}`}>{log.status}</span>
                   </div>
                 ))}
               </div>
             )}
 
             {historyTab === 'recharge' && (
-              <div className="space-y-2">
-                {rechargeOrders.map(ord => (
-                  <div key={ord.id} className="bg-[#141032] border border-white/10 rounded-2xl p-3.5 flex justify-between items-center shadow-lg text-white">
+              <div className="space-y-3">
+                <h4 className="font-bold text-slate-300 px-1 border-b border-white/10 pb-2">রিচার্জ হিস্ট্রি ({rechargeOrders.filter(o => o.status !== 'Pending').length})</h4>
+                {rechargeOrders.filter(o => o.status !== 'Pending').map(ord => (
+                  <div key={ord.id} className="bg-[#141032] border border-white/10 rounded-3xl p-4 flex justify-between items-center shadow-lg text-white">
                     <div>
-                      <p className="font-bold">{ord.operator} - ৳{ord.amount}</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">👤 {ord.userName} | <span className="font-mono text-indigo-300">{ord.targetNumber}</span></p>
+                      <p className="font-bold text-sm">{ord.operator} - ৳{ord.amount}</p>
+                      <p className="text-[10px] text-slate-400 mt-1 font-mono">{ord.targetNumber} | {ord.time}</p>
                     </div>
-                    <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-white/5 border border-white/10">{ord.status}</span>
+                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-xl border ${ord.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-rose-500/10 text-rose-400 border-rose-500/30'}`}>{ord.status}</span>
                   </div>
                 ))}
               </div>
             )}
 
             {historyTab === 'drive' && (
-              <div className="space-y-2">
-                {driveOrders.map(ord => (
-                  <div key={ord.id} className="bg-[#141032] border border-white/10 rounded-2xl p-3.5 flex justify-between items-center shadow-lg text-white">
+              <div className="space-y-3">
+                <h4 className="font-bold text-slate-300 px-1 border-b border-white/10 pb-2">ড্রাইভ হিস্ট্রি ({driveOrders.filter(o => o.status !== 'Pending').length})</h4>
+                {driveOrders.filter(o => o.status !== 'Pending').map(ord => (
+                  <div key={ord.id} className="bg-[#141032] border border-white/10 rounded-3xl p-4 flex justify-between items-center shadow-lg text-white">
                     <div>
-                      <p className="font-bold">{ord.operator} - ৳{ord.price}</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">👤 {ord.userName} | <span className="font-mono text-indigo-300">{ord.targetNumber}</span></p>
+                      <p className="font-bold text-sm">{ord.operator} - ৳{ord.price}</p>
+                      <p className="text-[10px] text-slate-400 mt-1 font-mono">{ord.targetNumber} | {ord.time}</p>
                     </div>
-                    <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-white/5 border border-white/10">{ord.status}</span>
+                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-xl border ${ord.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-rose-500/10 text-rose-400 border-rose-500/30'}`}>{ord.status}</span>
                   </div>
                 ))}
               </div>
