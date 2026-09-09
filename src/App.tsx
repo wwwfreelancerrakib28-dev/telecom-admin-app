@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { db } from './firebase';
 import { ref, set, push, onValue, update, remove } from 'firebase/database';
-// এখানে User as UserIcon যুক্ত করা হয়েছে
 import { 
   ShieldCheck, Wallet, Flame, MessageSquare, Search, Edit3, Trash2, 
   ToggleLeft, ToggleRight, Send, ArrowLeft, History, Lock, LogOut, 
@@ -28,15 +27,12 @@ export default function AdminApp() {
   const [runningNotice, setRunningNotice] = useState('🎉 স্বাগতম SIM OFFER SHOP এ!');
   const [noticeInput, setNoticeInput] = useState(runningNotice);
 
-  // ফোর্স আপডেট কন্ট্রোল
   const [forceUpdateEnabled, setForceUpdateEnabled] = useState(false);
   const [updateLink, setUpdateLink] = useState('https://play.google.com/store/apps/details?id=com.telecom.app');
 
-  // এড-মানি নোট
   const [addMoneyNote, setAddMoneyNote] = useState('প্রথমে নাম্বারে টাকা পাঠিয়ে ট্রানজ্যাকশন আইডি দিন।');
   const [noteInput, setNoteInput] = useState(addMoneyNote);
 
-  // ব্রডকাস্ট স্টেট
   const [broadcastType, setBroadcastType] = useState<'all' | 'personal'>('all');
   const [targetPhone, setTargetPhone] = useState('');
   const [broadcastMsg, setBroadcastMsg] = useState('');
@@ -46,9 +42,7 @@ export default function AdminApp() {
     Grameenphone: true, Robi: true, Banglalink: true, Airtel: true, Teletalk: true
   });
 
-  // সাপোর্ট লিংক
   const [socialLinks, setSocialLinks] = useState({ facebookPage: '', whatsappNumber: '' });
-
   const [scratchCardsList, setScratchCardsList] = useState<any[]>([]);
   const [newCard, setNewCard] = useState({ type: 'Minute', title: '', price: '' });
   const [popupAlert, setPopupAlert] = useState<string | null>(null);
@@ -160,6 +154,20 @@ export default function AdminApp() {
       } else { setChatMessages([]); }
     });
   }, [activeChatUser]);
+
+  // ফিজিক্যাল ব্যাক বাটন হ্যান্ডলার
+  useEffect(() => {
+    const backListener = CapacitorApp.addListener('backButton', () => {
+      if (cancellingOrder || selectedUser || activeSection !== 'menu') {
+        if (cancellingOrder) setCancellingOrder(null);
+        else if (selectedUser) setSelectedUser(null);
+        else setActiveSection('menu');
+      } else {
+        CapacitorApp.exitApp();
+      }
+    });
+    return () => { backListener.then(handler => handler.remove()); };
+  }, [cancellingOrder, selectedUser, activeSection]);
 
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -310,7 +318,6 @@ export default function AdminApp() {
     setSelectedUser({ ...selectedUser, mainBalance: main, driveBalance: drive });
     setPopupAlert('✅ ব্যালেন্স আপডেট সফল!');
   };
-  const toggleUserBan = (userId: string, currentStatus: boolean) => { update(ref(db, `users/${userId}`), { isBanned: !currentStatus }); };
 
   const appStats = {
     totalInstalls: usersList.length + 300,
@@ -321,7 +328,6 @@ export default function AdminApp() {
   const pendingRechargeCount = rechargeOrders.filter(o => o.status === 'Pending').length;
   const pendingDriveCount = driveOrders.filter(o => o.status === 'Pending').length;
   const pendingAddMoneyCount = addMoneyLogs.filter(o => o.status === 'Pending').length;
-  const filteredUsers = usersList.filter(u => (u.phone || '').includes(searchQuery.trim()) || (u.name || '').toLowerCase().includes(searchQuery.toLowerCase().trim()));
 
   if (!isAuthenticated) {
     return (
@@ -363,7 +369,7 @@ export default function AdminApp() {
         <button onClick={() => setIsAuthenticated(false)} className="p-2.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 active:scale-95 shadow-sm"><LogOut className="w-3.5 h-3.5" /></button>
       </header>
 
-      <main className="flex-1 p-3 max-w-lg mx-auto w-full overflow-y-auto space-y-4">
+      <main className="flex-1 p-3 max-w-lg mx-auto w-full overflow-y-auto space-y-4 pb-12">
         {activeSection === 'menu' && (
           <div className="space-y-4">
             <div className="bg-gradient-to-tr from-[#1a1442] via-[#241b5c] to-[#120e2e] border border-white/10 rounded-3xl p-5 text-white shadow-2xl space-y-3 relative overflow-hidden">
@@ -477,10 +483,10 @@ export default function AdminApp() {
 
         {/* রিচার্জ অর্ডার ভিউ */}
         {activeSection === 'recharge_orders' && (
-          <div className="space-y-3">
+          <div className="space-y-3 pb-6">
             <h4 className="font-bold text-slate-300 px-1 border-b border-white/10 pb-2">রিচার্জ অর্ডার রিকোয়েস্ট ({rechargeOrders.length})</h4>
             {rechargeOrders.map((ord) => (
-              <div key={ord.id} className="bg-[#141032] border border-white/10 rounded-3xl p-4 space-y-3 shadow-xl text-white">
+              <div key={ord.id} className="bg-[#141032] border border-white/10 rounded-3xl p-4 space-y-3 shadow-xl text-white mb-3">
                 <div className="flex justify-between items-center border-b border-white/10 pb-2">
                   <span className="font-black text-sky-400 text-xs bg-sky-500/10 border border-sky-500/20 px-2.5 py-1 rounded-xl uppercase">{ord.operator} - ৳{ord.amount}</span>
                   <span className={`text-[9px] font-bold px-2 py-0.5 rounded-lg ${ord.status === 'Completed' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : ord.status === 'Cancelled' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'}`}>{ord.status}</span>
@@ -507,10 +513,10 @@ export default function AdminApp() {
 
         {/* ড্রাইভ অর্ডার ভিউ */}
         {activeSection === 'drive_orders' && (
-          <div className="space-y-3">
+          <div className="space-y-3 pb-6">
             <h4 className="font-bold text-slate-300 px-1 border-b border-white/10 pb-2">ড্রাইভ প্যাক রিকোয়েস্ট ({driveOrders.length})</h4>
             {driveOrders.map((ord) => (
-              <div key={ord.id} className="bg-[#141032] border border-white/10 rounded-3xl p-4 space-y-3 shadow-xl text-white">
+              <div key={ord.id} className="bg-[#141032] border border-white/10 rounded-3xl p-4 space-y-3 shadow-xl text-white mb-3">
                 <div className="flex justify-between items-center border-b border-white/10 pb-2">
                   <span className="font-black text-amber-400 text-xs bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-xl uppercase">{ord.operator} - ৳{ord.price}</span>
                   <span className={`text-[9px] font-bold px-2 py-0.5 rounded-lg ${ord.status === 'Completed' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : ord.status === 'Cancelled' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'}`}>{ord.status}</span>
@@ -557,7 +563,7 @@ export default function AdminApp() {
 
         {/* অফার কন্ট্রোল ভিউ */}
         {activeSection === 'offers' && (
-          <div className="space-y-4">
+          <div className="space-y-4 pb-6">
             <div className="bg-[#141032] border border-white/10 rounded-3xl p-5 space-y-3 shadow-xl">
               <div className="flex items-center justify-between border-b border-white/10 pb-2">
                 <div>
@@ -651,7 +657,7 @@ export default function AdminApp() {
 
         {/* স্ক্র্যাচ কার্ড ভিউ */}
         {activeSection === 'scratch_cards' && (
-          <div className="space-y-4">
+          <div className="space-y-4 pb-6">
             <div className="bg-[#141032] border border-white/10 rounded-3xl p-5 space-y-3 shadow-xl">
               <h4 className="font-bold text-white border-b border-white/10 pb-2 flex items-center gap-1.5"><Ticket className="w-4 h-4 text-pink-500" /> নতুন স্ক্র্যাচ কার্ড তৈরি</h4>
               <select value={newCard.type} onChange={(e) => setNewCard({ ...newCard, type: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 font-bold text-white focus:outline-none focus:border-pink-500">
@@ -679,7 +685,7 @@ export default function AdminApp() {
 
         {/* এড মানি কন্ট্রোল ও নোট সেকশন */}
         {activeSection === 'add_money' && (
-          <div className="space-y-4">
+          <div className="space-y-4 pb-6">
             <div className="bg-[#141032] border border-white/10 rounded-3xl p-5 flex items-center justify-between shadow-xl">
               <div>
                 <h4 className="font-bold text-white">Add Balance সার্ভিস</h4>
@@ -717,7 +723,7 @@ export default function AdminApp() {
 
         {/* History Report */}
         {activeSection === 'history' && (
-          <div className="space-y-4">
+          <div className="space-y-4 pb-6">
             <div className="grid grid-cols-3 gap-1 bg-[#141032] border border-white/10 p-1.5 rounded-2xl shadow-inner">
               <button onClick={() => setHistoryTab('add_money')} className={`py-2 rounded-xl font-bold transition-all ${historyTab === 'add_money' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400'}`}>এড-মানি</button>
               <button onClick={() => setHistoryTab('recharge')} className={`py-2 rounded-xl font-bold transition-all ${historyTab === 'recharge' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400'}`}>রিচার্জ</button>
@@ -780,7 +786,7 @@ export default function AdminApp() {
 
         {/* ইউজার ম্যানেজার */}
         {activeSection === 'users' && !selectedUser && (
-          <div className="space-y-3">
+          <div className="space-y-3 pb-6">
             <div className="relative">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
               <input type="text" placeholder="নম্বর বা নাম দিয়ে খুঁজুন..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-[#141032] border border-white/20 rounded-2xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-indigo-500 shadow-lg" />
@@ -804,7 +810,7 @@ export default function AdminApp() {
 
         {/* ইউজার ব্যালেন্স এডিট */}
         {activeSection === 'users' && selectedUser && (
-          <div className="space-y-4">
+          <div className="space-y-4 pb-6">
             <div className="bg-[#141032] border border-white/10 rounded-3xl p-5 text-center shadow-xl text-white">
               <h3 className="text-base font-black">{selectedUser.name}</h3>
               <p className="text-[11px] text-slate-400 font-mono mt-1">📱 {selectedUser.phone}</p>
@@ -821,17 +827,14 @@ export default function AdminApp() {
                   <input type="number" value={customDriveBalance} onChange={(e) => setCustomDriveBalance(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 font-mono font-bold text-white focus:outline-none focus:border-indigo-500" />
                 </div>
               </div>
-              <button onClick={() => {
-                update(ref(db, `users/${selectedUser.id}`), { mainBalance: Number(customMainBalance) || 0, driveBalance: Number(customDriveBalance) || 0 });
-                setPopupAlert('✅ ব্যালেন্স আপডেট সফল!');
-              }} className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-xl shadow-lg active:scale-95">ব্যালেন্স আপডেট করুন</button>
+              <button onClick={handleSaveBalance} className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-xl shadow-lg active:scale-95">ব্যালেন্স আপডেট করুন</button>
             </div>
           </div>
         )}
 
         {/* লাইভ চ্যাট */}
         {activeSection === 'chats' && (
-          <div className="grid grid-cols-3 gap-2 h-[450px]">
+          <div className="grid grid-cols-3 gap-2 h-[450px] pb-6">
             <div className="bg-[#141032] border border-white/10 rounded-2xl p-2 overflow-y-auto space-y-1 shadow-xl">
               <h5 className="font-bold text-[10px] text-slate-400 p-2 text-center uppercase tracking-widest border-b border-white/5 mb-2">ইনবক্স</h5>
               {chatUsers.map(u => (
@@ -864,7 +867,7 @@ export default function AdminApp() {
 
         {/* ব্রডকাস্ট / নোটিশ */}
         {activeSection === 'broadcast' && (
-          <div className="space-y-4">
+          <div className="space-y-4 pb-6">
             <div className="bg-[#141032] border border-white/10 rounded-3xl p-5 space-y-3 shadow-xl">
               <h4 className="font-bold text-white border-b border-white/10 pb-2">রানিং নোটিশ আপডেট (App Marquee)</h4>
               <input type="text" value={noticeInput} onChange={(e) => setNoticeInput(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-white focus:outline-none focus:border-indigo-500" />
@@ -906,7 +909,7 @@ export default function AdminApp() {
 
         {/* ফোর্স আপডেট কন্ট্রোল পেজ */}
         {activeSection === 'update_control' && (
-          <div className="space-y-4">
+          <div className="space-y-4 pb-6">
             <div className="bg-[#141032] border border-white/10 rounded-3xl p-5 flex items-center justify-between shadow-xl">
               <div>
                 <h4 className="font-bold text-white">ফোর্স আপডেট (Force Update)</h4>
